@@ -552,6 +552,7 @@ th {
 }
 
 th[data-column-id] {
+  position: relative;
   cursor: grab;
 }
 
