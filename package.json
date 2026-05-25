@@ -1,0 +1,17 @@
+{
+  "name": "marketplace-reporting-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Expandable reporting system for Amazon, Bob Shop, Takealot, and future e-commerce marketplaces.",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.1"
+  }
+}

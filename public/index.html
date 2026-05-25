@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Marketplace Reporting</title>
+    <link rel="stylesheet" href="/styles.css?v=20260514-net-sales">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div>
+        <p class="eyebrow">Reporting</p>
+        <h1>Marketplace Control</h1>
+      </div>
+      <nav>
+        <button class="nav-button active" data-view="sales-reports">Sales Report</button>
+        <button class="nav-button" data-view="products">Products</button>
+        <button class="nav-button" data-view="suppliers">Suppliers</button>
+        <button class="nav-button" data-view="mappings">Mappings</button>
+        <button class="nav-button" data-view="integrations">Integrations</button>
+        <button class="nav-button" data-view="dashboard">Dashboard</button>
+      </nav>
+    </aside>
+
+    <main>
+      <section class="toolbar">
+        <div>
+          <p class="eyebrow">Unified product reporting</p>
+          <h2 id="view-title">Sales Report</h2>
+        </div>
+      </section>
+
+      <section id="sales-reports" class="view active">
+        <div class="panel table-panel">
+          <div class="panel-title compact-title report-header-row">
+            <h3 id="sales-report-title">Supplier Sales Report</h3>
+            <div class="view-controls sales-controls">
+              <label>
+                Group By
+                <select id="sales-report-mode">
+                  <option value="supplier">Supplier</option>
+                  <option value="marketplace">Marketplace</option>
+                  <option value="supplier-marketplace">Supplier + Marketplace</option>
+                  <option value="product">Product</option>
+                </select>
+              </label>
+              <label>
+                From
+                <input id="from-date" type="date">
+              </label>
+              <label>
+                To
+                <input id="to-date" type="date">
+              </label>
+              <label>
+                Marketplace
+                <select id="marketplace-filter"></select>
+              </label>
+              <label>
+                Search
+                <input id="sales-search" type="search" placeholder="Product, supplier, marketplace">
+              </label>
+              <label>
+                Density
+                <select id="density-control">
+                  <option value="compact">Compact</option>
+                  <option value="default">Normal</option>
+                  <option value="roomy">Roomy</option>
+                </select>
+              </label>
+              <details class="column-picker report-column-picker">
+                <summary>Columns</summary>
+                <div id="sales-column-list" class="column-options"></div>
+              </details>
+              <details class="column-picker layout-picker">
+                <summary>Layout</summary>
+                <div class="layout-options">
+                  <button id="reset-sales-columns" type="button">Reset Columns</button>
+                  <button id="reset-sales-widths" type="button">Reset Widths</button>
+                </div>
+              </details>
+              <button id="export-sales-csv" type="button">Export CSV</button>
+              <button id="refresh-report">Refresh</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="sales-table">
+              <thead>
+                <tr id="sales-report-head"></tr>
+              </thead>
+              <tbody id="sales-report-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="products" class="view">
+        <div class="panel table-panel">
+          <div class="panel-title compact-title report-header-row product-header-row">
+            <h3>Canonical Products</h3>
+            <div class="view-controls product-controls">
+              <label>
+                Search
+                <input id="product-search" type="search" placeholder="Name, SKU, supplier, identifier">
+              </label>
+              <label>
+                Row size
+                <select id="product-row-size">
+                  <option value="compact">Compact</option>
+                  <option value="default">Default</option>
+                  <option value="roomy">Roomy</option>
+                </select>
+              </label>
+              <details class="column-picker product-column-picker">
+                <summary>Columns</summary>
+                <div id="product-column-list" class="column-options"></div>
+              </details>
+              <details class="column-picker product-merge-picker">
+                <summary>Merge</summary>
+                <div class="merge-bar">
+                  <label>
+                    Master product
+                    <select id="merge-target"></select>
+                  </label>
+                  <button id="merge-products" type="button">Merge Selected</button>
+                </div>
+              </details>
+              <details class="column-picker layout-picker">
+                <summary>Layout</summary>
+                <div class="layout-options">
+                  <button id="reset-product-columns" type="button">Reset Columns</button>
+                  <button id="reset-product-widths" type="button">Reset Widths</button>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="product-table">
+              <thead>
+                <tr id="product-table-head"></tr>
+              </thead>
+              <tbody id="product-list"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="suppliers" class="view">
+        <div class="panel supplier-panel">
+          <div class="panel-title compact-title report-header-row supplier-header-row">
+            <h3>Suppliers</h3>
+            <form id="supplier-form" class="view-controls supplier-controls">
+              <label>Name<input name="name" required></label>
+              <button type="submit">Add Supplier</button>
+            </form>
+          </div>
+          <div id="supplier-list" class="list"></div>
+        </div>
+      </section>
+
+      <section id="integrations" class="view">
+        <div class="panel integration-panel">
+          <div class="panel-title compact-title">
+            <h3>Marketplace Connections</h3>
+          </div>
+          <div class="integration-row">
+            <div>
+              <strong>Takealot <span class="status-pill" id="takealot-pill">Checking</span></strong>
+              <p id="takealot-status" class="meta">Checking configuration...</p>
+            </div>
+            <div class="actions">
+              <button id="test-takealot" type="button">Test</button>
+              <button id="sync-takealot" type="button">Sync</button>
+            </div>
+          </div>
+
+          <div class="integration-row">
+            <div>
+              <strong>Amazon <span class="status-pill" id="amazon-pill">Checking</span></strong>
+              <p id="amazon-status" class="meta">Checking configuration...</p>
+            </div>
+            <div class="actions">
+              <button id="test-amazon" type="button">Test</button>
+              <button id="sync-amazon" type="button">Sync</button>
+              <button id="sync-amazon-fees" type="button">Sync Fees</button>
+              <button id="backfill-amazon" type="button">Backfill</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel integration-panel">
+          <div class="panel-title compact-title">
+            <h3>Data Import</h3>
+          </div>
+          <div class="integration-row">
+            <div>
+              <strong>CSV Import</strong>
+              <p id="csv-status" class="meta">Import sales rows from CSV or exported sales tables. Recognised columns include Product, Supplier, Marketplace, Latest Sale, Units, Gross, Imported Fees, SKU, ASIN, TSIN, status.</p>
+            </div>
+            <div class="actions">
+              <input id="csv-file" class="file-input" type="file" accept=".csv,text/csv">
+              <button id="import-csv" type="button">Import CSV</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="mappings" class="view">
+        <div class="panel mappings-panel">
+          <div class="panel-title compact-title">
+            <h3>Mappings</h3>
+          </div>
+          <form id="listing-form" class="mapping-form">
+            <label>Canonical Product<select name="productId"></select></label>
+            <label>Marketplace<select name="marketplaceId"></select></label>
+            <label>Identifier Type<input name="identifierType" placeholder="ASIN, TSIN, Listing ID" required></label>
+            <label>Identifier<input name="marketplaceIdentifier" required></label>
+            <label>Marketplace SKU<input name="marketplaceSku"></label>
+            <label>Marketplace Title<input name="title"></label>
+            <button type="submit">Map Identifier</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <h3>Marketplace Mappings</h3>
+          <div id="listing-list" class="list"></div>
+        </div>
+      </section>
+
+      <section id="dashboard" class="view">
+        <div class="metrics">
+          <article>
+            <span>Total sales</span>
+            <strong id="metric-sales">R0.00</strong>
+          </article>
+          <article>
+            <span>Imported fees</span>
+            <strong id="metric-fees">R0.00</strong>
+          </article>
+          <article>
+            <span>Estimated profit</span>
+            <strong id="metric-profit">R0.00</strong>
+          </article>
+          <article>
+            <span>Units sold</span>
+            <strong id="metric-units">0</strong>
+          </article>
+        </div>
+        <p id="fee-status" class="status-note"></p>
+
+      </section>
+
+    </main>
+
+    <script src="/app.js?v=20260514-net-sales" type="module"></script>
+  </body>
+</html>
