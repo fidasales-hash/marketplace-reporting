@@ -55,7 +55,7 @@ const productColumns = [
   { id: "supplier", label: "Supplier", defaultVisible: true },
   { id: "cost", label: "Cost", defaultVisible: true },
   { id: "marketplaces", label: "Marketplaces", defaultVisible: true },
-  { id: "stockOnHand", label: "Stock (Takealot)", defaultVisible: true },
+  { id: "stockOnHand", label: "Stock (TK)", defaultVisible: true },
   { id: "identifiers", label: "Identifiers", defaultVisible: true },
   { id: "lastSale", label: "Last Sale", defaultVisible: true },
   { id: "units", label: "Units", defaultVisible: true },
@@ -956,7 +956,7 @@ function salesReportConfig() {
     const productCommon = common.filter((column) => column.key !== "productCount");
     const latestIdx = productCommon.findIndex((column) => column.key === "latestSaleDate");
     const productColumns = [...productCommon];
-    productColumns.splice(latestIdx + 1, 0, { key: "stockOnHand", label: "Stock (Takealot)" });
+    productColumns.splice(latestIdx + 1, 0, { key: "stockOnHand", label: "Stock (TK)" });
     return {
       title: "Sales By Product",
       rows: state.summary,
