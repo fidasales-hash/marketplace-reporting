@@ -765,7 +765,7 @@ function productStockOnHand(mappings) {
       total = (total ?? 0) + Number(stock);
     }
     for (const dc of (apiData.stockAtTakealot || [])) {
-      const name = dc.dc ?? "Unknown DC";
+      const name = dc.warehouse?.name ?? dc.dc ?? "Unknown";
       const qty = Number(dc.quantity_available ?? 0);
       dcMap.set(name, (dcMap.get(name) ?? 0) + qty);
     }
