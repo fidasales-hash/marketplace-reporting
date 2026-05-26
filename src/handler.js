@@ -1,6 +1,6 @@
 import { syncAmazonApiData, syncAmazonFinanceData, syncAmazonReportsData, testAmazonConnection } from "./adapters/amazon.js";
 import { marketplaces } from "./adapters/marketplaces.js";
-import { testTakealotConnection, syncTakealotApiData, syncTakealotOffers } from "./adapters/takealot.js";
+import { testTakealotConnection, syncTakealotApiData, syncTakealotOffers, isTakealotConfigured } from "./adapters/takealot.js";
 import { getConfig, loadEnv } from "./config.js";
 import { buildMarketplaceSummary, buildProductSummary, buildSupplierMarketplaceSummary, buildSupplierSummary } from "./reporting.js";
 import { makeId, readStore, writeStore } from "./db.js";
@@ -328,6 +328,39 @@ export async function handleApi(req, res, url) {
     const result = importCsvRows(data, rows, String(body.source || "csv"));
     await writeStore(data);
     sendJson(res, 200, result);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/cron/sync") {
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.authorization !== `Bearer ${secret}`) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+    const data = await readStore();
+    const results = {};
+    let dirty = false;
+    if (isTakealotConfigured(config)) {
+      try {
+        const r = await syncTakealotApiData(config, data);
+        if (r.ok) dirty = true;
+        results.takealot = r.message;
+      } catch (err) {
+        results.takealot = `Error: ${err.message}`;
+      }
+    }
+    const amazonConfigured = Boolean(config.amazon.refreshToken && config.amazon.clientId && config.amazon.clientSecret && config.amazon.marketplaceId);
+    if (amazonConfigured) {
+      try {
+        const r = await syncAmazonApiData(config, data);
+        if (r.ok) dirty = true;
+        results.amazon = r.message;
+      } catch (err) {
+        results.amazon = `Error: ${err.message}`;
+      }
+    }
+    if (dirty) await writeStore(data);
+    sendJson(res, 200, { ok: true, timestamp: new Date().toISOString(), results });
     return;
   }
 

@@ -124,6 +124,7 @@ await load();
 bindNavigation();
 bindForms();
 await refreshReport();
+setInterval(async () => { await load(); await refreshReport(); }, 5 * 60 * 1000);
 
 async function load() {
   Object.assign(state, await api("/api/bootstrap"));

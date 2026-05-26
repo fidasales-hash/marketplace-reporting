@@ -1,4 +1,10 @@
 {
   "version": 2,
-  "outputDirectory": "public"
+  "outputDirectory": "public",
+  "crons": [
+    {
+      "path": "/api/cron/sync",
+      "schedule": "0 4 * * *"
+    }
+  ]
 }
