@@ -509,11 +509,7 @@ function exportSalesCsv() {
 }
 
 function exportSalesValue(item, key) {
-  if (key === "stockOnHand") {
-    const mappings = state.listings.filter((listing) => listing.productId === item.productId);
-    const stock = productStockOnHand(mappings);
-    return stock.total ?? "";
-  }
+  if (key === "stockOnHand") return item.stockOnHand ?? "";
   if (["returnedValue", "grossSales", "marketplaceFees", "estimatedProfit"].includes(key)) return Number(item[key] || 0).toFixed(2);
   if (key === "marketplaces") return (item.marketplaces || []).join(" | ");
   return item[key] ?? "";
@@ -1269,10 +1265,7 @@ function salesSearchText(item) {
 
 function salesValue(item, key) {
   if (key === "marketplaces") return (item.marketplaces || []).join(", ").toLowerCase();
-  if (key === "stockOnHand") {
-    const mappings = state.listings.filter((listing) => listing.productId === item.productId);
-    return productStockOnHand(mappings).total ?? -1;
-  }
+  if (key === "stockOnHand") return item.stockOnHand ?? -1;
   if (["productCount", "units", "returnedUnits", "returnedValue", "cancelledUnits", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) return Number(item[key]) || 0;
   return String(item[key] ?? "").toLowerCase();
 }
@@ -1287,10 +1280,7 @@ function formatSalesCell(item, key) {
       </select>
     `;
   }
-  if (key === "stockOnHand") {
-    const mappings = state.listings.filter((listing) => listing.productId === item.productId);
-    return formatStockCell(productStockOnHand(mappings));
-  }
+  if (key === "stockOnHand") return item.stockOnHand != null ? escapeHtml(String(item.stockOnHand)) : "—";
   if (["returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) return currency.format(item[key] || 0);
   if (key === "marketplaces") return escapeHtml((item.marketplaces || []).join(", "));
   return escapeHtml(item[key] ?? "");

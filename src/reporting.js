@@ -61,11 +61,27 @@ export function buildProductSummary(data, filters = {}) {
     summaries.set(product.id, current);
   }
 
-  return Array.from(summaries.values()).map((summary) => ({
-    ...summary,
-    marketplaces: Array.from(summary.marketplaces),
-    identifiers: uniqueIdentifiers(summary.identifiers)
-  }));
+  const listingsByProduct = new Map();
+  for (const listing of data.listings) {
+    if (!listingsByProduct.has(listing.productId)) listingsByProduct.set(listing.productId, []);
+    listingsByProduct.get(listing.productId).push(listing);
+  }
+
+  return Array.from(summaries.values()).map((summary) => {
+    const listings = listingsByProduct.get(summary.productId) || [];
+    let stockOnHand = null;
+    for (const listing of listings) {
+      if (listing.marketplaceId !== "takealot") continue;
+      const s = listing.apiData?.stockAtTakealotTotal;
+      if (s !== null && s !== undefined) stockOnHand = (stockOnHand ?? 0) + Number(s);
+    }
+    return {
+      ...summary,
+      stockOnHand,
+      marketplaces: Array.from(summary.marketplaces),
+      identifiers: uniqueIdentifiers(summary.identifiers)
+    };
+  });
 }
 
 export function buildSupplierSummary(data, filters = {}) {
