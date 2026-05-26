@@ -38,7 +38,7 @@ const requiredSalesColumns = {
   product: ["productName", "supplierName"]
 };
 
-const salesColumnStorageVersion = "7";
+const salesColumnStorageVersion = "8";
 const tableColumnWidthsStorageKey = "tableColumnWidths:v2";
 let salesReportColumns = loadSalesReportColumns();
 let tableColumnWidths = loadTableColumnWidths();
@@ -55,6 +55,7 @@ const productColumns = [
   { id: "supplier", label: "Supplier", defaultVisible: true },
   { id: "cost", label: "Cost", defaultVisible: true },
   { id: "marketplaces", label: "Marketplaces", defaultVisible: true },
+  { id: "stockOnHand", label: "Stock (Takealot)", defaultVisible: true },
   { id: "identifiers", label: "Identifiers", defaultVisible: true },
   { id: "lastSale", label: "Last Sale", defaultVisible: true },
   { id: "units", label: "Units", defaultVisible: true },
@@ -76,6 +77,7 @@ const defaultColumnWidths = {
     supplier: 150,
     cost: 76,
     marketplaces: 98,
+    stockOnHand: 90,
     identifiers: 220,
     lastSale: 98,
     units: 76,
@@ -94,6 +96,7 @@ const defaultColumnWidths = {
     marketplaces: 130,
     marketplaceId: 130,
     latestSaleDate: 96,
+    stockOnHand: 90,
     productCount: 74,
     units: 74,
     returnedUnits: 74,
@@ -550,6 +553,7 @@ function renderProducts() {
     const supplier = state.suppliers.find((item) => item.id === product.supplierId);
     const mappings = state.listings.filter((listing) => listing.productId === product.id);
     const sales = productSalesSummary(product, mappings);
+    const stock = productStockOnHand(mappings);
     const marketplaceNames = [...new Set(mappings.map((listing) => listing.marketplaceId))].join(", ");
     const identifiers = mappings.map((listing) => `${listing.marketplaceId} ${listing.identifierType}: ${listing.marketplaceIdentifier}`).join(" | ");
     const cells = {
@@ -564,6 +568,7 @@ function renderProducts() {
       `),
       cost: productCell("cost", currency.format(product.cost)),
       marketplaces: productCell("marketplaces", escapeHtml(marketplaceNames || "None")),
+      stockOnHand: productCell("stockOnHand", formatStockCell(stock)),
       identifiers: productCell("identifiers", escapeHtml(identifiers || "No marketplace identifiers"), "compact-cell"),
       lastSale: productCell("lastSale", escapeHtml(sales.lastSale || "")),
       units: productCell("units", sales.units),
@@ -701,6 +706,7 @@ function productValue(product, key) {
   if (key === "marketplaces") return [...new Set(mappings.map((listing) => listing.marketplaceId))].join(", ").toLowerCase();
   if (key === "identifiers") return mappings.map((listing) => listing.marketplaceIdentifier).join(" | ").toLowerCase();
   if (key === "dateCreated") return getProductDateCreated(product, mappings);
+  if (key === "stockOnHand") return productStockOnHand(mappings).total ?? -1;
   if (["lastSale", "units", "returnedUnits", "returnedValue", "cancelledUnits", "grossSales", "marketplaceFees", "estimatedProfit"].includes(key)) {
     return productSalesSummary(product, mappings)[key];
   }
@@ -745,6 +751,43 @@ function getProductDateCreated(product, mappings = []) {
     .filter(Boolean)
     .sort();
   return dates[0] || product.createdAt || "";
+}
+
+function productStockOnHand(mappings) {
+  let total = null;
+  const dcMap = new Map();
+  let onWay = null;
+  for (const listing of mappings) {
+    if (listing.marketplaceId !== "takealot") continue;
+    const apiData = listing.apiData || {};
+    const stock = apiData.stockAtTakealotTotal;
+    if (stock !== null && stock !== undefined) {
+      total = (total ?? 0) + Number(stock);
+    }
+    for (const dc of (apiData.stockAtTakealot || [])) {
+      const name = dc.dc ?? "Unknown DC";
+      const qty = Number(dc.quantity_available ?? 0);
+      dcMap.set(name, (dcMap.get(name) ?? 0) + qty);
+    }
+    const ow = apiData.totalStockOnWay;
+    if (ow !== null && ow !== undefined) {
+      onWay = (onWay ?? 0) + Number(ow);
+    }
+  }
+  return { total, dcBreakdown: [...dcMap.entries()], onWay };
+}
+
+function formatStockCell(stock) {
+  if (stock.total === null) return "—";
+  const lines = [];
+  for (const [dc, qty] of stock.dcBreakdown) {
+    lines.push(`${dc}: ${qty}`);
+  }
+  if (stock.onWay !== null && stock.onWay > 0) {
+    lines.push(`On Way: ${stock.onWay}`);
+  }
+  const tooltip = lines.length > 0 ? ` title="${escapeHtml(lines.join("\n"))}"` : "";
+  return `<span${tooltip}>${escapeHtml(String(stock.total))}</span>`;
 }
 
 function renderSuppliers() {
@@ -910,6 +953,10 @@ function salesReportConfig() {
     };
   }
   if (salesReport.mode === "product") {
+    const productCommon = common.filter((column) => column.key !== "productCount");
+    const latestIdx = productCommon.findIndex((column) => column.key === "latestSaleDate");
+    const productColumns = [...productCommon];
+    productColumns.splice(latestIdx + 1, 0, { key: "stockOnHand", label: "Stock (Takealot)" });
     return {
       title: "Sales By Product",
       rows: state.summary,
@@ -917,7 +964,7 @@ function salesReportConfig() {
         { key: "productName", label: "Product" },
         { key: "supplierName", label: "Supplier" },
         { key: "marketplaces", label: "Marketplaces" },
-        ...common.filter((column) => column.key !== "productCount")
+        ...productColumns
       ]
     };
   }
@@ -1217,6 +1264,10 @@ function salesSearchText(item) {
 
 function salesValue(item, key) {
   if (key === "marketplaces") return (item.marketplaces || []).join(", ").toLowerCase();
+  if (key === "stockOnHand") {
+    const mappings = state.listings.filter((listing) => listing.productId === item.productId);
+    return productStockOnHand(mappings).total ?? -1;
+  }
   if (["productCount", "units", "returnedUnits", "returnedValue", "cancelledUnits", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) return Number(item[key]) || 0;
   return String(item[key] ?? "").toLowerCase();
 }
@@ -1230,6 +1281,10 @@ function formatSalesCell(item, key) {
         ${state.suppliers.map((supplier) => `<option value="${escapeHtml(supplier.id)}" ${supplier.id === product?.supplierId ? "selected" : ""}>${escapeHtml(supplier.name)}</option>`).join("")}
       </select>
     `;
+  }
+  if (key === "stockOnHand") {
+    const mappings = state.listings.filter((listing) => listing.productId === item.productId);
+    return formatStockCell(productStockOnHand(mappings));
   }
   if (["returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) return currency.format(item[key] || 0);
   if (key === "marketplaces") return escapeHtml((item.marketplaces || []).join(", "));
