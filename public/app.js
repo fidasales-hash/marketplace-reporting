@@ -509,6 +509,11 @@ function exportSalesCsv() {
 }
 
 function exportSalesValue(item, key) {
+  if (key === "stockOnHand") {
+    const mappings = state.listings.filter((listing) => listing.productId === item.productId);
+    const stock = productStockOnHand(mappings);
+    return stock.total ?? "";
+  }
   if (["returnedValue", "grossSales", "marketplaceFees", "estimatedProfit"].includes(key)) return Number(item[key] || 0).toFixed(2);
   if (key === "marketplaces") return (item.marketplaces || []).join(" | ");
   return item[key] ?? "";
