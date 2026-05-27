@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Marketplace Reporting</title>
-    <link rel="stylesheet" href="/styles.css?v=20260514-net-sales">
+    <link rel="stylesheet" href="/styles.css?v=20260527-unified-products">
   </head>
   <body>
     <aside class="sidebar">
@@ -27,6 +27,20 @@
           <p class="eyebrow">Unified product reporting</p>
           <h2 id="view-title">Sales Report</h2>
         </div>
+        <div class="toolbar-filters">
+          <label>
+            From
+            <input id="from-date" type="date">
+          </label>
+          <label>
+            To
+            <input id="to-date" type="date">
+          </label>
+          <label>
+            Marketplace
+            <select id="marketplace-filter"></select>
+          </label>
+        </div>
       </section>
 
       <!-- Sales Report -->
@@ -38,23 +52,10 @@
               <label>
                 Group By
                 <select id="sales-report-mode">
-                  <option value="product" selected>Product</option>
-                  <option value="supplier">Supplier</option>
+                  <option value="supplier" selected>Supplier</option>
                   <option value="marketplace">Marketplace</option>
                   <option value="supplier-marketplace">Supplier + Marketplace</option>
                 </select>
-              </label>
-              <label>
-                From
-                <input id="from-date" type="date">
-              </label>
-              <label>
-                To
-                <input id="to-date" type="date">
-              </label>
-              <label>
-                Marketplace
-                <select id="marketplace-filter"></select>
               </label>
               <label>
                 Search
@@ -289,6 +290,6 @@
 
     </main>
 
-    <script src="/app.js?v=20260514-net-sales" type="module"></script>
+    <script src="/app.js?v=20260527-unified-products" type="module"></script>
   </body>
 </html>

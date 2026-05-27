@@ -27,18 +27,16 @@ let salesSearchQuery = "";
 const defaultSalesColumns = {
   supplier: ["supplierName", "marketplaces", "latestSaleDate", "productCount", "units", "returnedUnits", "returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"],
   marketplace: ["marketplaceId", "latestSaleDate", "productCount", "units", "returnedUnits", "returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"],
-  "supplier-marketplace": ["supplierName", "marketplaceId", "latestSaleDate", "productCount", "units", "returnedUnits", "returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"],
-  product: ["productName", "supplierName", "marketplaces", "latestSaleDate", "units", "returnedUnits", "returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"]
+  "supplier-marketplace": ["supplierName", "marketplaceId", "latestSaleDate", "productCount", "units", "returnedUnits", "returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"]
 };
 
 const requiredSalesColumns = {
   supplier: ["supplierName"],
   marketplace: ["marketplaceId"],
-  "supplier-marketplace": ["supplierName", "marketplaceId"],
-  product: ["productName", "supplierName"]
+  "supplier-marketplace": ["supplierName", "marketplaceId"]
 };
 
-const salesColumnStorageVersion = "8";
+const salesColumnStorageVersion = "9";
 const tableColumnWidthsStorageKey = "tableColumnWidths:v2";
 let salesReportColumns = loadSalesReportColumns();
 let tableColumnWidths = loadTableColumnWidths();
@@ -64,6 +62,7 @@ const productColumns = [
   { id: "cancelledUnits", label: "Cancelled", defaultVisible: false },
   { id: "grossSales", label: "Sales", defaultVisible: true },
   { id: "marketplaceFees", label: "Fees", defaultVisible: false },
+  { id: "netSales", label: "Net Sales", defaultVisible: true },
   { id: "estimatedProfit", label: "Profit", defaultVisible: true },
   { id: "dateCreated", label: "API Created", defaultVisible: false },
   { id: "source", label: "Source", defaultVisible: false }
@@ -86,6 +85,7 @@ const defaultColumnWidths = {
     cancelledUnits: 76,
     grossSales: 106,
     marketplaceFees: 106,
+    netSales: 106,
     estimatedProfit: 106,
     dateCreated: 98,
     source: 100
@@ -111,6 +111,7 @@ const defaultColumnWidths = {
 let visibleProductColumns = loadProductColumns();
 let productRowSize = loadDensity();
 let productSearchQuery = "";
+let productSummaryMap = new Map();
 
 const qs = (selector, root = document) => root.querySelector(selector);
 const qsa = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -144,8 +145,10 @@ async function refreshReport() {
   state.supplierSummary = await api(`/api/reports/suppliers?${params}`);
   state.marketplaceSummary = await api(`/api/reports/marketplaces?${params}`);
   state.supplierMarketplaceSummary = await api(`/api/reports/supplier-marketplaces?${params}`);
+  productSummaryMap = new Map(state.summary.map((item) => [item.productId, item]));
   renderSummary();
   renderSalesReport();
+  renderProducts();
 }
 
 function bindNavigation() {
@@ -212,10 +215,6 @@ function bindNavigation() {
       salesReport.sortDirection = ["productName", "supplierName", "marketplaceId", "marketplaces", "group"].includes(key) ? "asc" : "desc";
     }
     renderSalesReport();
-  });
-  qs("#sales-report-table").addEventListener("change", async (event) => {
-    if (!event.target.matches("[data-sales-product-supplier]")) return;
-    await assignProductSupplier(event.target.dataset.salesProductSupplier, event.target.value);
   });
   qs("#test-takealot").addEventListener("click", testTakealot);
   qs("#sync-takealot").addEventListener("click", syncTakealot);
@@ -534,8 +533,7 @@ function exportSalesCsv() {
 }
 
 function exportSalesValue(item, key) {
-  if (key === "stockOnHand") return item.stockOnHand ?? "";
-  if (["returnedValue", "grossSales", "marketplaceFees", "estimatedProfit"].includes(key)) return Number(item[key] || 0).toFixed(2);
+  if (["returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) return Number(item[key] || 0).toFixed(2);
   if (key === "marketplaces") return (item.marketplaces || []).join(" | ");
   return item[key] ?? "";
 }
@@ -576,9 +574,8 @@ function renderProducts() {
   applyTableWidth("product", visibleProductColumns, qs(".product-table"));
   const products = getSortedProducts();
   qs("#product-list").innerHTML = products.map((product) => {
-    const supplier = state.suppliers.find((item) => item.id === product.supplierId);
     const mappings = state.listings.filter((listing) => listing.productId === product.id);
-    const sales = productSalesSummary(product, mappings);
+    const summary = productSummaryMap.get(product.id) || {};
     const stock = productStockOnHand(mappings);
     const marketplaceNames = [...new Set(mappings.map((listing) => listing.marketplaceId))].join(", ");
     const identifiers = mappings.map((listing) => `${listing.marketplaceId} ${listing.identifierType}: ${listing.marketplaceIdentifier}`).join(" | ");
@@ -596,14 +593,15 @@ function renderProducts() {
       marketplaces: productCell("marketplaces", escapeHtml(marketplaceNames || "None")),
       stockOnHand: productCell("stockOnHand", formatStockCell(stock)),
       identifiers: productCell("identifiers", escapeHtml(identifiers || "No marketplace identifiers"), "compact-cell"),
-      lastSale: productCell("lastSale", escapeHtml(sales.lastSale || "")),
-      units: productCell("units", sales.units),
-      returnedUnits: productCell("returnedUnits", sales.returnedUnits),
-      returnedValue: productCell("returnedValue", currency.format(sales.returnedValue)),
-      cancelledUnits: productCell("cancelledUnits", sales.cancelledUnits),
-      grossSales: productCell("grossSales", currency.format(sales.grossSales)),
-      marketplaceFees: productCell("marketplaceFees", currency.format(sales.marketplaceFees)),
-      estimatedProfit: productCell("estimatedProfit", currency.format(sales.estimatedProfit)),
+      lastSale: productCell("lastSale", escapeHtml(summary.latestSaleDate || "")),
+      units: productCell("units", summary.units ?? 0),
+      returnedUnits: productCell("returnedUnits", summary.returnedUnits ?? 0),
+      returnedValue: productCell("returnedValue", currency.format(summary.returnedValue ?? 0)),
+      cancelledUnits: productCell("cancelledUnits", summary.cancelledUnits ?? 0),
+      grossSales: productCell("grossSales", currency.format(summary.grossSales ?? 0)),
+      marketplaceFees: productCell("marketplaceFees", currency.format(summary.marketplaceFees ?? 0)),
+      netSales: productCell("netSales", currency.format(summary.netSales ?? 0)),
+      estimatedProfit: productCell("estimatedProfit", currency.format(summary.estimatedProfit ?? 0)),
       dateCreated: productCell("dateCreated", escapeHtml(getProductDateCreated(product, mappings) || "")),
       source: productCell("source", escapeHtml(product.source || "local"))
     };
@@ -650,7 +648,8 @@ function loadProductColumns() {
 }
 
 function ensureRequiredProductColumns(columns) {
-  return insertColumnAfter(insertColumnAfter(columns, "returnedUnits", "units"), "returnedValue", "returnedUnits");
+  let next = insertColumnAfter(insertColumnAfter(columns, "returnedUnits", "units"), "returnedValue", "returnedUnits");
+  return insertColumnAfter(next, "netSales", "marketplaceFees");
 }
 
 function saveProductColumns() {
@@ -727,41 +726,20 @@ function productSearchText(product) {
 function productValue(product, key) {
   const mappings = state.listings.filter((listing) => listing.productId === product.id);
   const supplier = state.suppliers.find((item) => item.id === product.supplierId);
+  const summary = productSummaryMap.get(product.id) || {};
   if (key === "supplier") return String(supplier?.name ?? "").toLowerCase();
   if (key === "cost") return Number(product.cost) || 0;
   if (key === "marketplaces") return [...new Set(mappings.map((listing) => listing.marketplaceId))].join(", ").toLowerCase();
   if (key === "identifiers") return mappings.map((listing) => listing.marketplaceIdentifier).join(" | ").toLowerCase();
   if (key === "dateCreated") return getProductDateCreated(product, mappings);
   if (key === "stockOnHand") return productStockOnHand(mappings).total ?? -1;
-  if (["lastSale", "units", "returnedUnits", "returnedValue", "cancelledUnits", "grossSales", "marketplaceFees", "estimatedProfit"].includes(key)) {
-    return productSalesSummary(product, mappings)[key];
+  if (key === "lastSale") return summary.latestSaleDate || "";
+  if (["units", "returnedUnits", "returnedValue", "cancelledUnits", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) {
+    return Number(summary[key]) || 0;
   }
   return String(product[key] ?? "").toLowerCase();
 }
 
-function productSalesSummary(product, mappings = []) {
-  const listingIds = new Set(mappings.map((listing) => listing.id));
-  const transactions = state.transactions.filter((transaction) => listingIds.has(transaction.listingId));
-  const units = transactions.reduce((sum, transaction) => sum + (Number(transaction.quantity) || 0), 0);
-  const returnedUnits = transactions.reduce((sum, transaction) => sum + (isReturnedTransaction(transaction) ? Number(transaction.quantity) || 0 : 0), 0);
-  const returnedValue = transactions.reduce((sum, transaction) => sum + (isReturnedTransaction(transaction) ? Number(transaction.grossSales) || 0 : 0), 0);
-  const cancelledUnits = transactions.reduce((sum, transaction) => sum + (isCancelledTransaction(transaction) ? Number(transaction.quantity) || 0 : 0), 0);
-  const activeTransactions = transactions.filter((transaction) => !isReturnedTransaction(transaction) && !isCancelledTransaction(transaction));
-  const activeUnits = activeTransactions.reduce((sum, transaction) => sum + (Number(transaction.quantity) || 0), 0);
-  const grossSales = activeTransactions.reduce((sum, transaction) => sum + (Number(transaction.grossSales) || 0), 0);
-  const marketplaceFees = activeTransactions.reduce((sum, transaction) => sum + (Number(transaction.marketplaceFees) || 0), 0);
-  const productCost = (Number(product.cost) || 0) * activeUnits;
-  return {
-    lastSale: transactions.map((transaction) => transaction.date).filter(Boolean).sort().at(-1) || "",
-    units: activeUnits,
-    returnedUnits,
-    returnedValue,
-    cancelledUnits,
-    grossSales,
-    marketplaceFees,
-    estimatedProfit: grossSales - marketplaceFees - productCost
-  };
-}
 
 function isReturnedTransaction(transaction) {
   return String(transaction.saleStatus || transaction.apiData?.saleStatus || "").toLowerCase().includes("return");
@@ -1007,22 +985,6 @@ function salesReportConfig() {
         { key: "supplierName", label: "Supplier" },
         { key: "marketplaceId", label: "Marketplace" },
         ...common
-      ]
-    };
-  }
-  if (salesReport.mode === "product") {
-    const productCommon = common.filter((column) => column.key !== "productCount");
-    const latestIdx = productCommon.findIndex((column) => column.key === "latestSaleDate");
-    const productColumns = [...productCommon];
-    productColumns.splice(latestIdx + 1, 0, { key: "stockOnHand", label: "Stock (TK)" });
-    return {
-      title: "Sales By Product",
-      rows: state.summary,
-      columns: [
-        { key: "productName", label: "Product" },
-        { key: "supplierName", label: "Supplier" },
-        { key: "marketplaces", label: "Marketplaces" },
-        ...productColumns
       ]
     };
   }
@@ -1322,22 +1284,11 @@ function salesSearchText(item) {
 
 function salesValue(item, key) {
   if (key === "marketplaces") return (item.marketplaces || []).join(", ").toLowerCase();
-  if (key === "stockOnHand") return item.stockOnHand ?? -1;
   if (["productCount", "units", "returnedUnits", "returnedValue", "cancelledUnits", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) return Number(item[key]) || 0;
   return String(item[key] ?? "").toLowerCase();
 }
 
 function formatSalesCell(item, key) {
-  if (salesReport.mode === "product" && key === "supplierName") {
-    const product = state.products.find((candidate) => candidate.id === item.productId);
-    return `
-      <select data-sales-product-supplier="${escapeHtml(item.productId)}">
-        <option value="">Unassigned</option>
-        ${state.suppliers.map((supplier) => `<option value="${escapeHtml(supplier.id)}" ${supplier.id === product?.supplierId ? "selected" : ""}>${escapeHtml(supplier.name)}</option>`).join("")}
-      </select>
-    `;
-  }
-  if (key === "stockOnHand") return item.stockOnHand != null ? escapeHtml(String(item.stockOnHand)) : "—";
   if (["returnedValue", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) return currency.format(item[key] || 0);
   if (key === "marketplaces") return escapeHtml((item.marketplaces || []).join(", "));
   return escapeHtml(item[key] ?? "");
