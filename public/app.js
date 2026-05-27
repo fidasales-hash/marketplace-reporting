@@ -1158,15 +1158,14 @@ function startColumnDrag(event) {
   if (!header) return;
   const scope = header.dataset.columnScope;
   const columnId = header.dataset.columnId;
-  console.log("[drag] start", scope, columnId);
-  header.setPointerCapture(event.pointerId);
   activeColumnDrag = {
     scope,
     columnId,
     startX: event.clientX,
     startY: event.clientY,
     moved: false,
-    sourceHeader: header
+    sourceHeader: header,
+    pointerId: event.pointerId
   };
   window.addEventListener("pointermove", moveColumnDrag);
   window.addEventListener("pointerup", endColumnDrag, { once: true });
@@ -1177,7 +1176,9 @@ function moveColumnDrag(event) {
   const distance = Math.abs(event.clientX - activeColumnDrag.startX) + Math.abs(event.clientY - activeColumnDrag.startY);
   if (distance < 8) return;
 
-  console.log("[drag] move threshold crossed", activeColumnDrag.scope, activeColumnDrag.columnId);
+  if (!activeColumnDrag.moved) {
+    activeColumnDrag.sourceHeader.setPointerCapture(activeColumnDrag.pointerId);
+  }
   activeColumnDrag.moved = true;
   suppressNextHeaderClick = true;
   document.body.classList.add("column-dragging");
