@@ -324,6 +324,8 @@ function renderIntegrationStatus(message = "") {
   renderStatusPill("#takealot-pill", configured ? "Connected" : "Missing", configured);
   qs("#sync-takealot").disabled = !configured;
   qs("#test-takealot").disabled = !configured;
+  const takealotSynced = qs("#takealot-synced");
+  if (takealotSynced) takealotSynced.textContent = takealot?.lastSynced ? `Last synced ${timeAgo(takealot.lastSynced)}` : "";
 
   const amazon = state.integrations.amazon;
   if (amazon) {
@@ -341,7 +343,29 @@ function renderIntegrationStatus(message = "") {
     qs("#sync-amazon").disabled = !amazon.configured;
     qs("#sync-amazon-fees").disabled = !amazon.configured;
     qs("#backfill-amazon").disabled = !amazon.configured;
+    const amazonSynced = qs("#amazon-synced");
+    if (amazonSynced) amazonSynced.textContent = amazon.lastSynced ? `Last synced ${timeAgo(amazon.lastSynced)}` : "";
   }
+
+  const nextSync = qs("#next-sync-time");
+  if (nextSync) nextSync.textContent = nextSyncTime();
+}
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function nextSyncTime() {
+  const now = new Date();
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 4, 0, 0));
+  if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+  return next.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
 }
 
 function renderStatusPill(selector, label, good) {
@@ -899,6 +923,38 @@ function renderSummary() {
   qs("#fee-status").textContent = totals.marketplaceFees > 0
     ? "Fees shown are imported from connected marketplace data."
     : "No fee/commission source is connected yet. Takealot sales API does not provide seller fee amounts in the synced sales data.";
+
+  renderMarketplaceMetrics();
+  renderTopProducts();
+}
+
+function renderMarketplaceMetrics() {
+  const container = qs("#marketplace-metrics");
+  if (!container) return;
+  const rows = state.marketplaceSummary || [];
+  container.innerHTML = rows.map((item) => {
+    const mp = (state.marketplaces || []).find((m) => m.id === item.marketplaceId);
+    return `
+      <article>
+        <span>${escapeHtml(mp?.name ?? item.marketplaceId)}</span>
+        <strong>${currency.format(item.grossSales)}</strong>
+        <small>${item.units} units &middot; ${currency.format(item.estimatedProfit)} profit</small>
+      </article>`;
+  }).join("") || "";
+}
+
+function renderTopProducts() {
+  const container = qs("#top-products-list");
+  if (!container) return;
+  const top = [...(state.summary || [])].sort((a, b) => b.grossSales - a.grossSales).slice(0, 10);
+  container.innerHTML = top.map((item, i) => `
+    <tr>
+      <td>${i + 1}. ${escapeHtml(item.productName)}</td>
+      <td>${escapeHtml(item.supplierName || "—")}</td>
+      <td style="text-align:right">${item.units}</td>
+      <td style="text-align:right">${currency.format(item.grossSales)}</td>
+      <td style="text-align:right">${currency.format(item.estimatedProfit)}</td>
+    </tr>`).join("") || `<tr><td colspan="5" class="empty-cell">No sales data yet.</td></tr>`;
 }
 
 function renderSalesReport() {

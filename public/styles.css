@@ -855,6 +855,77 @@ th {
   background: #ffefcf;
 }
 
+.catalogue-split {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.catalogue-right {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.marketplace-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+
+.marketplace-metrics article {
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.marketplace-metrics article span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.marketplace-metrics article strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.12rem;
+}
+
+.marketplace-metrics article small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.dash-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.dash-table th {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  color: #35413e;
+  background: #e8eeeb;
+  font-weight: 800;
+  padding: 0.28rem 0.5rem;
+}
+
+.dash-table td {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-table td:nth-child(n+3) {
+  text-align: right;
+}
+
 @media (max-width: 900px) {
   body {
     grid-template-columns: 1fr;

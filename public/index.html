@@ -15,8 +15,7 @@
       <nav>
         <button class="nav-button active" data-view="sales-reports">Sales Report</button>
         <button class="nav-button" data-view="products">Products</button>
-        <button class="nav-button" data-view="suppliers">Suppliers</button>
-        <button class="nav-button" data-view="mappings">Mappings</button>
+        <button class="nav-button" data-view="catalogue">Catalogue</button>
         <button class="nav-button" data-view="integrations">Integrations</button>
         <button class="nav-button" data-view="dashboard">Dashboard</button>
       </nav>
@@ -30,6 +29,7 @@
         </div>
       </section>
 
+      <!-- Sales Report -->
       <section id="sales-reports" class="view active">
         <div class="panel table-panel">
           <div class="panel-title compact-title report-header-row">
@@ -94,6 +94,7 @@
         </div>
       </section>
 
+      <!-- Products -->
       <section id="products" class="view">
         <div class="panel table-panel">
           <div class="panel-title compact-title report-header-row product-header-row">
@@ -145,32 +146,66 @@
         </div>
       </section>
 
-      <section id="suppliers" class="view">
-        <div class="panel supplier-panel">
-          <div class="panel-title compact-title report-header-row supplier-header-row">
-            <h3>Suppliers</h3>
-            <form id="supplier-form" class="view-controls supplier-controls">
-              <label>Name<input name="name" required></label>
-              <button type="submit">Add Supplier</button>
-            </form>
+      <!-- Catalogue: Suppliers + Mappings -->
+      <section id="catalogue" class="view">
+        <div class="catalogue-split">
+
+          <!-- Suppliers -->
+          <div class="panel supplier-panel">
+            <div class="panel-title compact-title supplier-header-row">
+              <h3>Suppliers</h3>
+              <form id="supplier-form" class="view-controls supplier-controls">
+                <label>Name<input name="name" required></label>
+                <button type="submit">Add</button>
+              </form>
+            </div>
+            <div id="supplier-list" class="list"></div>
           </div>
-          <div id="supplier-list" class="list"></div>
+
+          <!-- Mappings -->
+          <div class="catalogue-right">
+            <div class="panel mappings-panel">
+              <div class="panel-title compact-title">
+                <h3>Add Mapping</h3>
+              </div>
+              <form id="listing-form" class="mapping-form">
+                <label>Canonical Product<select name="productId"></select></label>
+                <label>Marketplace<select name="marketplaceId"></select></label>
+                <label>Identifier Type<input name="identifierType" placeholder="ASIN, TSIN, Listing ID" required></label>
+                <label>Identifier<input name="marketplaceIdentifier" required></label>
+                <label>Marketplace SKU<input name="marketplaceSku"></label>
+                <label>Marketplace Title<input name="title"></label>
+                <button type="submit">Add Mapping</button>
+              </form>
+            </div>
+            <div class="panel">
+              <div class="panel-title compact-title">
+                <h3>Marketplace Mappings</h3>
+              </div>
+              <div id="listing-list" class="list"></div>
+            </div>
+          </div>
+
         </div>
       </section>
 
+      <!-- Integrations -->
       <section id="integrations" class="view">
         <div class="panel integration-panel">
           <div class="panel-title compact-title">
             <h3>Marketplace Connections</h3>
+            <span class="meta">Auto-syncs daily &middot; Next at <strong id="next-sync-time"></strong></span>
           </div>
+
           <div class="integration-row">
             <div>
               <strong>Takealot <span class="status-pill" id="takealot-pill">Checking</span></strong>
               <p id="takealot-status" class="meta">Checking configuration...</p>
+              <p id="takealot-synced" class="meta"></p>
             </div>
             <div class="actions">
               <button id="test-takealot" type="button">Test</button>
-              <button id="sync-takealot" type="button">Sync</button>
+              <button id="sync-takealot" type="button">Sync Now</button>
             </div>
           </div>
 
@@ -178,10 +213,11 @@
             <div>
               <strong>Amazon <span class="status-pill" id="amazon-pill">Checking</span></strong>
               <p id="amazon-status" class="meta">Checking configuration...</p>
+              <p id="amazon-synced" class="meta"></p>
             </div>
             <div class="actions">
               <button id="test-amazon" type="button">Test</button>
-              <button id="sync-amazon" type="button">Sync</button>
+              <button id="sync-amazon" type="button">Sync Sales</button>
               <button id="sync-amazon-fees" type="button">Sync Fees</button>
               <button id="backfill-amazon" type="button">Backfill</button>
             </div>
@@ -195,7 +231,7 @@
           <div class="integration-row">
             <div>
               <strong>CSV Import</strong>
-              <p id="csv-status" class="meta">Import sales rows from CSV or exported sales tables. Recognised columns include Product, Supplier, Marketplace, Latest Sale, Units, Gross, Imported Fees, SKU, ASIN, TSIN, status.</p>
+              <p id="csv-status" class="meta">Import sales rows from CSV or exported sales tables. Recognised columns: Product, Supplier, Marketplace, Units, Gross, Fees, SKU, ASIN, TSIN.</p>
             </div>
             <div class="actions">
               <input id="csv-file" class="file-input" type="file" accept=".csv,text/csv">
@@ -205,49 +241,50 @@
         </div>
       </section>
 
-      <section id="mappings" class="view">
-        <div class="panel mappings-panel">
-          <div class="panel-title compact-title">
-            <h3>Mappings</h3>
-          </div>
-          <form id="listing-form" class="mapping-form">
-            <label>Canonical Product<select name="productId"></select></label>
-            <label>Marketplace<select name="marketplaceId"></select></label>
-            <label>Identifier Type<input name="identifierType" placeholder="ASIN, TSIN, Listing ID" required></label>
-            <label>Identifier<input name="marketplaceIdentifier" required></label>
-            <label>Marketplace SKU<input name="marketplaceSku"></label>
-            <label>Marketplace Title<input name="title"></label>
-            <button type="submit">Map Identifier</button>
-          </form>
-        </div>
-
-        <div class="panel">
-          <h3>Marketplace Mappings</h3>
-          <div id="listing-list" class="list"></div>
-        </div>
-      </section>
-
+      <!-- Dashboard -->
       <section id="dashboard" class="view">
         <div class="metrics">
           <article>
             <span>Total sales</span>
-            <strong id="metric-sales">R0.00</strong>
+            <strong id="metric-sales">—</strong>
           </article>
           <article>
             <span>Imported fees</span>
-            <strong id="metric-fees">R0.00</strong>
+            <strong id="metric-fees">—</strong>
           </article>
           <article>
             <span>Estimated profit</span>
-            <strong id="metric-profit">R0.00</strong>
+            <strong id="metric-profit">—</strong>
           </article>
           <article>
             <span>Units sold</span>
-            <strong id="metric-units">0</strong>
+            <strong id="metric-units">—</strong>
           </article>
         </div>
+
+        <div id="marketplace-metrics" class="marketplace-metrics"></div>
+
         <p id="fee-status" class="status-note"></p>
 
+        <div class="panel">
+          <div class="panel-title compact-title">
+            <h3>Top Products <span class="meta">· by gross sales</span></h3>
+          </div>
+          <div class="table-wrap">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th style="width:40%">Product</th>
+                  <th style="width:18%">Supplier</th>
+                  <th style="width:10%">Units</th>
+                  <th style="width:16%">Sales</th>
+                  <th style="width:16%">Profit</th>
+                </tr>
+              </thead>
+              <tbody id="top-products-list"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
     </main>

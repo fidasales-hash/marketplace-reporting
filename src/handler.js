@@ -16,7 +16,8 @@ export async function handleApi(req, res, url) {
       integrations: {
         takealot: {
           configured: Boolean(config.takealot.apiKey),
-          baseUrl: config.takealot.baseUrl
+          baseUrl: config.takealot.baseUrl,
+          lastSynced: data.syncedAt?.takealot ?? null
         },
         amazon: {
           configured: Boolean(config.amazon.refreshToken && config.amazon.clientId && config.amazon.clientSecret && config.amazon.marketplaceId),
@@ -25,7 +26,8 @@ export async function handleApi(req, res, url) {
           hasClientSecret: Boolean(config.amazon.clientSecret),
           hasMarketplaceId: Boolean(config.amazon.marketplaceId),
           baseUrl: config.amazon.baseUrl,
-          region: config.amazon.region
+          region: config.amazon.region,
+          lastSynced: data.syncedAt?.amazon ?? null
         }
       },
       ...data
@@ -50,7 +52,10 @@ export async function handleApi(req, res, url) {
       from: url.searchParams.get("from"),
       to: url.searchParams.get("to")
     });
-    if (result.ok) await writeStore(data);
+    if (result.ok) {
+      data.syncedAt = { ...data.syncedAt, amazon: new Date().toISOString() };
+      await writeStore(data);
+    }
     sendJson(res, result.status, result);
     return;
   }
@@ -91,7 +96,10 @@ export async function handleApi(req, res, url) {
       from: url.searchParams.get("from"),
       to: url.searchParams.get("to")
     });
-    if (result.ok) await writeStore(data);
+    if (result.ok) {
+      data.syncedAt = { ...data.syncedAt, takealot: new Date().toISOString() };
+      await writeStore(data);
+    }
     sendJson(res, result.status, result);
     return;
   }
@@ -343,7 +351,7 @@ export async function handleApi(req, res, url) {
     if (isTakealotConfigured(config)) {
       try {
         const r = await syncTakealotApiData(config, data);
-        if (r.ok) dirty = true;
+        if (r.ok) { data.syncedAt = { ...data.syncedAt, takealot: new Date().toISOString() }; dirty = true; }
         results.takealot = r.message;
       } catch (err) {
         results.takealot = `Error: ${err.message}`;
@@ -353,7 +361,7 @@ export async function handleApi(req, res, url) {
     if (amazonConfigured) {
       try {
         const r = await syncAmazonApiData(config, data);
-        if (r.ok) dirty = true;
+        if (r.ok) { data.syncedAt = { ...data.syncedAt, amazon: new Date().toISOString() }; dirty = true; }
         results.amazon = r.message;
       } catch (err) {
         results.amazon = `Error: ${err.message}`;
