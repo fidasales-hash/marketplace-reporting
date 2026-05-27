@@ -563,6 +563,7 @@ th {
 th[data-column-id] {
   position: relative;
   cursor: grab;
+  user-select: none;
 }
 
 th[data-column-id]:active {

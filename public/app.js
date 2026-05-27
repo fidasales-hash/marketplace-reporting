@@ -119,7 +119,6 @@ let activeColumnResize = null;
 let activeColumnDrag = null;
 let suppressNextHeaderClick = false;
 const activeTableWidthTotals = { product: 0, sales: 0 };
-const lockedProductColumns = ["merge", "name"];
 
 await load();
 bindNavigation();
@@ -226,6 +225,7 @@ function bindNavigation() {
   qs("#merge-products").addEventListener("click", mergeSelectedProducts);
   qs("#reset-product-columns").addEventListener("click", resetProductColumns);
   qs("#reset-product-widths").addEventListener("click", () => resetTableColumnWidths("product"));
+  qs("#export-products-csv").addEventListener("click", exportProductsCsv);
   qs("#product-column-list").addEventListener("change", (event) => {
     if (!event.target.matches("[data-product-column]")) return;
     const columnId = event.target.dataset.productColumn;
@@ -528,6 +528,50 @@ function exportSalesCsv() {
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = `${salesReport.mode}-sales-${formatLocalDate(new Date())}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function exportProductsCsv() {
+  const exportColumns = visibleProductColumns.filter((id) => id !== "merge");
+  const columns = exportColumns.map((id) => productColumns.find((col) => col.id === id)).filter(Boolean);
+  const products = getSortedProducts();
+  const csv = [
+    columns.map((col) => csvValue(col.label)).join(","),
+    ...products.map((product) => {
+      const mappings = state.listings.filter((listing) => listing.productId === product.id);
+      const supplier = state.suppliers.find((item) => item.id === product.supplierId);
+      const summary = productSummaryMap.get(product.id) || {};
+      const stock = productStockOnHand(mappings);
+      return columns.map((col) => {
+        switch (col.id) {
+          case "name": return csvValue(product.name);
+          case "sku": return csvValue(product.sku);
+          case "supplier": return csvValue(supplier?.name ?? "");
+          case "cost": return csvValue(Number(product.cost || 0).toFixed(2));
+          case "marketplaces": return csvValue([...new Set(mappings.map((l) => l.marketplaceId))].join(", "));
+          case "stockOnHand": return csvValue(stock.total ?? "");
+          case "identifiers": return csvValue(mappings.map((l) => `${l.marketplaceId} ${l.identifierType}: ${l.marketplaceIdentifier}`).join(" | "));
+          case "lastSale": return csvValue(summary.latestSaleDate ?? "");
+          case "units": return csvValue(summary.units ?? 0);
+          case "returnedUnits": return csvValue(summary.returnedUnits ?? 0);
+          case "cancelledUnits": return csvValue(summary.cancelledUnits ?? 0);
+          case "returnedValue":
+          case "grossSales":
+          case "marketplaceFees":
+          case "netSales":
+          case "estimatedProfit": return csvValue(Number(summary[col.id] || 0).toFixed(2));
+          case "dateCreated": return csvValue(getProductDateCreated(product, mappings));
+          case "source": return csvValue(product.source || "local");
+          default: return csvValue(product[col.id] ?? "");
+        }
+      }).join(",");
+    })
+  ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `products-${formatLocalDate(new Date())}.csv`;
   link.click();
   URL.revokeObjectURL(link.href);
 }
@@ -1114,8 +1158,8 @@ function startColumnDrag(event) {
   if (!header) return;
   const scope = header.dataset.columnScope;
   const columnId = header.dataset.columnId;
-  if (scope === "product" && lockedProductColumns.includes(columnId)) return;
-
+  console.log("[drag] start", scope, columnId);
+  header.setPointerCapture(event.pointerId);
   activeColumnDrag = {
     scope,
     columnId,
@@ -1133,6 +1177,7 @@ function moveColumnDrag(event) {
   const distance = Math.abs(event.clientX - activeColumnDrag.startX) + Math.abs(event.clientY - activeColumnDrag.startY);
   if (distance < 8) return;
 
+  console.log("[drag] move threshold crossed", activeColumnDrag.scope, activeColumnDrag.columnId);
   activeColumnDrag.moved = true;
   suppressNextHeaderClick = true;
   document.body.classList.add("column-dragging");
@@ -1141,7 +1186,6 @@ function moveColumnDrag(event) {
   qsa("th.column-drag-target").forEach((header) => header.classList.remove("column-drag-target"));
   const targetHeader = document.elementFromPoint(event.clientX, event.clientY)?.closest("th[data-column-id]");
   if (!targetHeader || targetHeader.dataset.columnScope !== activeColumnDrag.scope) return;
-  if (activeColumnDrag.scope === "product" && lockedProductColumns.includes(targetHeader.dataset.columnId)) return;
   if (targetHeader.dataset.columnId !== activeColumnDrag.columnId) targetHeader.classList.add("column-drag-target");
 }
 
@@ -1154,10 +1198,11 @@ function endColumnDrag(event) {
   qsa(".column-drag-source, .column-drag-target").forEach((header) => header.classList.remove("column-drag-source", "column-drag-target"));
   window.removeEventListener("pointermove", moveColumnDrag);
 
+  console.log("[drag] end — moved:", drag.moved, "targetHeader:", targetHeader?.dataset.columnId, "targetScope:", targetHeader?.dataset.columnScope, "dragScope:", drag.scope);
   if (!drag.moved || !targetHeader || targetHeader.dataset.columnScope !== drag.scope) return;
   const targetColumnId = targetHeader.dataset.columnId;
   if (!targetColumnId || targetColumnId === drag.columnId) return;
-  if (drag.scope === "product" && lockedProductColumns.includes(targetColumnId)) return;
+
   const targetRect = targetHeader.getBoundingClientRect();
   const insertAfter = event.clientX > targetRect.left + targetRect.width / 2;
   reorderColumn(drag.scope, drag.columnId, targetColumnId, insertAfter);
@@ -1172,12 +1217,7 @@ function reorderColumn(scope, sourceColumnId, targetColumnId, insertAfter = fals
     return;
   }
 
-  const unlocked = visibleProductColumns.filter((columnId) => !lockedProductColumns.includes(columnId));
-  const reordered = moveColumn(unlocked, sourceColumnId, targetColumnId, insertAfter);
-  visibleProductColumns = [
-    ...lockedProductColumns.filter((columnId) => visibleProductColumns.includes(columnId)),
-    ...reordered
-  ];
+  visibleProductColumns = moveColumn(visibleProductColumns, sourceColumnId, targetColumnId, insertAfter);
   saveProductColumns();
   renderProducts();
 }
