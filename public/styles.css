@@ -603,6 +603,43 @@ th[data-column-id]:active {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+.stock-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  -moz-appearance: textfield;
+  cursor: text;
+}
+
+.stock-input::-webkit-outer-spin-button,
+.stock-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stock-input:focus {
+  outline: 1px solid var(--accent);
+  border-radius: 2px;
+  background: #fff;
+  padding: 0 2px;
+}
+
+.stock-input--saving {
+  opacity: 0.45;
+}
+
+.stock-input--saved {
+  color: var(--accent);
+}
+
+.stock-input--error {
+  color: #c0392b;
+  outline: 1px solid #c0392b;
+}
+
 .compact-cell {
   white-space: nowrap;
   overflow: hidden;

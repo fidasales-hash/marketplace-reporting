@@ -214,14 +214,33 @@ async function fetchSales(config, startDate, endDate) {
   return sales;
 }
 
-async function takealotRequest(config, pathname) {
+async function takealotRequest(config, pathname, options = {}) {
   const base = config.takealot.baseUrl.replace(/\/$/, "");
-  return fetch(`${base}${pathname}`, {
-    headers: {
-      Accept: "application/json",
-      Authorization: `Key ${config.takealot.apiKey}`
-    }
+  const method = options.method || "GET";
+  const headers = {
+    Accept: "application/json",
+    Authorization: `Key ${config.takealot.apiKey}`
+  };
+  if (options.body) headers["Content-Type"] = "application/json";
+  return fetch(`${base}${pathname}`, { method, headers, body: options.body || undefined });
+}
+
+export async function updateTakealotOfferStock(config, offerId, quantity) {
+  if (!isTakealotConfigured(config)) return missingConfigResult();
+  const response = await takealotRequest(config, `/offers/${encodeURIComponent(offerId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      leadtime_stock: [{ leadtime_days: 0, quantity: Math.max(0, Math.floor(quantity)) }]
+    })
   });
+  const payload = await response.json().catch(() => ({}));
+  return {
+    ok: response.ok,
+    status: response.status,
+    message: response.ok
+      ? `Stock updated to ${quantity} for offer ${offerId}.`
+      : payload.message ?? `Stock update failed with status ${response.status}`
+  };
 }
 
 function normalizeOffer(offer) {

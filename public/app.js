@@ -53,7 +53,9 @@ const productColumns = [
   { id: "supplier", label: "Supplier", defaultVisible: true },
   { id: "cost", label: "Cost", defaultVisible: true },
   { id: "marketplaces", label: "Marketplaces", defaultVisible: true },
+  { id: "warehouseStock", label: "Warehouse", defaultVisible: true },
   { id: "stockOnHand", label: "Stock (TK)", defaultVisible: true },
+  { id: "availableToShip", label: "Avail. (TK)", defaultVisible: true },
   { id: "identifiers", label: "Identifiers", defaultVisible: true },
   { id: "lastSale", label: "Last Sale", defaultVisible: true },
   { id: "units", label: "Units", defaultVisible: true },
@@ -76,7 +78,9 @@ const defaultColumnWidths = {
     supplier: 150,
     cost: 76,
     marketplaces: 98,
+    warehouseStock: 90,
     stockOnHand: 90,
+    availableToShip: 90,
     identifiers: 220,
     lastSale: 98,
     units: 76,
@@ -247,6 +251,17 @@ function bindNavigation() {
     qs("#density-control").value = productRowSize;
     applyProductTableDisplay();
   });
+  qs("#product-list").addEventListener("keydown", (event) => {
+    if (event.target.matches(".stock-input") && event.key === "Enter") {
+      event.preventDefault();
+      event.target.blur();
+    }
+  });
+  qs("#product-list").addEventListener("change", (event) => {
+    if (!event.target.matches(".stock-input")) return;
+    if (event.target.dataset.listingId) saveProductStock(event.target);
+    else if (event.target.dataset.productId) saveWarehouseStock(event.target);
+  });
   qs("#product-table-head").addEventListener("click", (event) => {
     if (event.target.closest("[data-column-resize]") || suppressNextHeaderClick) {
       suppressNextHeaderClick = false;
@@ -372,6 +387,53 @@ function renderStatusPill(selector, label, good) {
   pill.textContent = label;
   pill.classList.toggle("ok", Boolean(good));
   pill.classList.toggle("warn", !good);
+}
+
+async function saveProductStock(input) {
+  const listingId = input.dataset.listingId;
+  const quantity = Number(input.value);
+  if (!listingId || isNaN(quantity) || quantity < 0) return;
+  input.disabled = true;
+  input.classList.add("stock-input--saving");
+  try {
+    await api("/api/stock/takealot", { method: "POST", body: JSON.stringify({ listingId, quantity }) });
+    input.classList.remove("stock-input--saving");
+    input.classList.add("stock-input--saved");
+    setTimeout(() => input.classList.remove("stock-input--saved"), 2000);
+    const listing = state.listings.find((item) => item.id === listingId);
+    if (listing) listing.apiData = { ...(listing.apiData || {}), leadtimeStock: [{ leadtime_days: 0, quantity }] };
+  } catch {
+    input.classList.remove("stock-input--saving");
+    input.classList.add("stock-input--error");
+    setTimeout(() => input.classList.remove("stock-input--error"), 3000);
+  } finally {
+    input.disabled = false;
+  }
+}
+
+async function saveWarehouseStock(input) {
+  const productId = input.dataset.productId;
+  const warehouseStock = input.value === "" ? null : Number(input.value);
+  if (!productId) return;
+  input.disabled = true;
+  input.classList.add("stock-input--saving");
+  try {
+    await api(`/api/products/${encodeURIComponent(productId)}/stock`, {
+      method: "PATCH",
+      body: JSON.stringify({ warehouseStock })
+    });
+    input.classList.remove("stock-input--saving");
+    input.classList.add("stock-input--saved");
+    setTimeout(() => input.classList.remove("stock-input--saved"), 2000);
+    const product = state.products.find((item) => item.id === productId);
+    if (product) product.warehouseStock = warehouseStock;
+  } catch {
+    input.classList.remove("stock-input--saving");
+    input.classList.add("stock-input--error");
+    setTimeout(() => input.classList.remove("stock-input--error"), 3000);
+  } finally {
+    input.disabled = false;
+  }
 }
 
 async function testTakealot() {
@@ -551,6 +613,10 @@ function exportProductsCsv() {
           case "cost": return csvValue(Number(product.cost || 0).toFixed(2));
           case "marketplaces": return csvValue([...new Set(mappings.map((l) => l.marketplaceId))].join(", "));
           case "stockOnHand": return csvValue(stock.total ?? "");
+          case "availableToShip": {
+            const tkListing = mappings.find((l) => l.marketplaceId === "takealot");
+            return csvValue((tkListing?.apiData?.leadtimeStock ?? []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0));
+          }
           case "identifiers": return csvValue(mappings.map((l) => `${l.marketplaceId} ${l.identifierType}: ${l.marketplaceIdentifier}`).join(" | "));
           case "lastSale": return csvValue(summary.latestSaleDate ?? "");
           case "units": return csvValue(summary.units ?? 0);
@@ -635,7 +701,14 @@ function renderProducts() {
       `),
       cost: productCell("cost", currency.format(product.cost)),
       marketplaces: productCell("marketplaces", escapeHtml(marketplaceNames || "None")),
+      warehouseStock: productCell("warehouseStock", `<input type="number" class="stock-input" value="${escapeHtml(String(product.warehouseStock ?? ""))}" min="0" data-product-id="${escapeHtml(product.id)}" placeholder="—">`),
       stockOnHand: productCell("stockOnHand", formatStockCell(stock)),
+      availableToShip: (() => {
+        const tkListing = mappings.find((l) => l.marketplaceId === "takealot" && l.apiData?.offerId);
+        if (!tkListing) return productCell("availableToShip", "—");
+        const total = (tkListing.apiData?.leadtimeStock ?? []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+        return productCell("availableToShip", `<input type="number" class="stock-input" value="${escapeHtml(String(total))}" min="0" data-listing-id="${escapeHtml(tkListing.id)}" placeholder="—">`);
+      })(),
       identifiers: productCell("identifiers", escapeHtml(identifiers || "No marketplace identifiers"), "compact-cell"),
       lastSale: productCell("lastSale", escapeHtml(summary.latestSaleDate || "")),
       units: productCell("units", summary.units ?? 0),
@@ -776,7 +849,12 @@ function productValue(product, key) {
   if (key === "marketplaces") return [...new Set(mappings.map((listing) => listing.marketplaceId))].join(", ").toLowerCase();
   if (key === "identifiers") return mappings.map((listing) => listing.marketplaceIdentifier).join(" | ").toLowerCase();
   if (key === "dateCreated") return getProductDateCreated(product, mappings);
+  if (key === "warehouseStock") return product.warehouseStock ?? -1;
   if (key === "stockOnHand") return productStockOnHand(mappings).total ?? -1;
+  if (key === "availableToShip") {
+    const tkListing = mappings.find((l) => l.marketplaceId === "takealot");
+    return (tkListing?.apiData?.leadtimeStock ?? []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  }
   if (key === "lastSale") return summary.latestSaleDate || "";
   if (["units", "returnedUnits", "returnedValue", "cancelledUnits", "grossSales", "marketplaceFees", "netSales", "estimatedProfit"].includes(key)) {
     return Number(summary[key]) || 0;
@@ -828,12 +906,8 @@ function productStockOnHand(mappings) {
 function formatStockCell(stock) {
   if (stock.total === null) return "—";
   const lines = [];
-  for (const [dc, qty] of stock.dcBreakdown) {
-    lines.push(`${dc}: ${qty}`);
-  }
-  if (stock.onWay !== null && stock.onWay > 0) {
-    lines.push(`On Way: ${stock.onWay}`);
-  }
+  for (const [dc, qty] of stock.dcBreakdown) lines.push(`${dc}: ${qty}`);
+  if (stock.onWay !== null && stock.onWay > 0) lines.push(`On Way: ${stock.onWay}`);
   const tooltip = lines.length > 0 ? ` title="${escapeHtml(lines.join("\n"))}"` : "";
   return `<span${tooltip}>${escapeHtml(String(stock.total))}</span>`;
 }

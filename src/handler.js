@@ -1,6 +1,6 @@
 import { syncAmazonApiData, syncAmazonFinanceData, syncAmazonReportsData, testAmazonConnection } from "./adapters/amazon.js";
 import { marketplaces } from "./adapters/marketplaces.js";
-import { testTakealotConnection, syncTakealotApiData, syncTakealotOffers, isTakealotConfigured } from "./adapters/takealot.js";
+import { testTakealotConnection, syncTakealotApiData, syncTakealotOffers, updateTakealotOfferStock, isTakealotConfigured } from "./adapters/takealot.js";
 import { getConfig, loadEnv } from "./config.js";
 import { buildMarketplaceSummary, buildProductSummary, buildSupplierMarketplaceSummary, buildSupplierSummary } from "./reporting.js";
 import { makeId, readStore, writeStore } from "./db.js";
@@ -98,6 +98,34 @@ export async function handleApi(req, res, url) {
     });
     if (result.ok) {
       data.syncedAt = { ...data.syncedAt, takealot: new Date().toISOString() };
+      await writeStore(data);
+    }
+    sendJson(res, result.status, result);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/stock/takealot") {
+    const body = await readJson(req);
+    const listingId = String(body.listingId ?? "");
+    const quantity = Number(body.quantity);
+    if (!listingId || isNaN(quantity) || quantity < 0) {
+      sendJson(res, 400, { error: "listingId and a non-negative quantity are required." });
+      return;
+    }
+    const data = await readStore();
+    const listing = data.listings.find((item) => item.id === listingId);
+    if (!listing) {
+      sendJson(res, 404, { error: "Listing not found." });
+      return;
+    }
+    const offerId = listing.apiData?.offerId;
+    if (!offerId) {
+      sendJson(res, 400, { error: "No Takealot offer ID for this listing. Sync offers first." });
+      return;
+    }
+    const result = await updateTakealotOfferStock(config, offerId, quantity);
+    if (result.ok) {
+      listing.apiData = { ...listing.apiData, stockAtTakealotTotal: quantity };
       await writeStore(data);
     }
     sendJson(res, result.status, result);
@@ -250,6 +278,26 @@ export async function handleApi(req, res, url) {
       mergedProductCount: sourceSet.size,
       movedListings
     });
+    return;
+  }
+
+  const productStockMatch = url.pathname.match(/^\/api\/products\/([^/]+)\/stock$/);
+  if (req.method === "PATCH" && productStockMatch) {
+    const body = await readJson(req);
+    const warehouseStock = body.warehouseStock === null ? null : Number(body.warehouseStock);
+    if (warehouseStock !== null && (isNaN(warehouseStock) || warehouseStock < 0)) {
+      sendJson(res, 400, { error: "warehouseStock must be a non-negative number or null." });
+      return;
+    }
+    const data = await readStore();
+    const product = data.products.find((item) => item.id === productStockMatch[1]);
+    if (!product) {
+      sendJson(res, 404, { error: "Product not found." });
+      return;
+    }
+    product.warehouseStock = warehouseStock;
+    await writeStore(data);
+    sendJson(res, 200, product);
     return;
   }
 
