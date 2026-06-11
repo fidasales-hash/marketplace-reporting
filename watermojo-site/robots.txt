@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://watermojo.co.za/sitemap.xml
