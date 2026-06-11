@@ -1,0 +1,13 @@
+{
+  "redirects": [
+    { "source": "/wp-admin/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-login.php", "destination": "/", "statusCode": 301 },
+    { "source": "/wp-json/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/xmlrpc.php", "destination": "/", "statusCode": 301 },
+    { "source": "/feed/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/sitemap_index.xml", "destination": "/sitemap.xml", "statusCode": 301 },
+    { "source": "/author/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/category/:path*", "destination": "/", "statusCode": 301 },
+    { "source": "/tag/:path*", "destination": "/", "statusCode": 301 }
+  ]
+}

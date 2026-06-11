@@ -1,0 +1,68 @@
+[build]
+  publish = "."
+
+# WordPress admin / system paths — force redirect even if files somehow exist
+[[redirects]]
+  from = "/wp-admin/*"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/wp-login.php"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/wp-json/*"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/xmlrpc.php"
+  to = "/"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/feed/*"
+  to = "/"
+  status = 301
+  force = true
+
+# Old Yoast sitemap → new sitemap
+[[redirects]]
+  from = "/sitemap_index.xml"
+  to = "/sitemap.xml"
+  status = 301
+
+[[redirects]]
+  from = "/*-sitemap.xml"
+  to = "/sitemap.xml"
+  status = 301
+
+# Old WordPress pages / blog posts / author archives → homepage
+[[redirects]]
+  from = "/author/*"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/category/*"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/tag/*"
+  to = "/"
+  status = 301
+
+# Catch-all: redirect any unrecognised path to homepage
+# Note: static files (index.html, sitemap.xml, robots.txt) are served first by Netlify
+# and are NOT affected by this rule unless force = true
+[[redirects]]
+  from = "/*"
+  to = "/"
+  status = 301
