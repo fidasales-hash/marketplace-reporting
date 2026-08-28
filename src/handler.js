@@ -359,6 +359,23 @@ export async function handleApi(req, res, url) {
     return;
   }
 
+  const productMatch = url.pathname.match(/^\/api\/products\/([^/]+)$/);
+  if (productMatch && req.method === "DELETE") {
+    const data = await readStore();
+    const productIndex = data.products.findIndex((item) => item.id === productMatch[1]);
+    if (productIndex === -1) {
+      sendJson(res, 404, { error: "Product not found." });
+      return;
+    }
+
+    data.products.splice(productIndex, 1);
+    const removedListings = data.listings.filter((listing) => listing.productId === productMatch[1]).length;
+    data.listings = data.listings.filter((listing) => listing.productId !== productMatch[1]);
+    await writeStore(data);
+    sendJson(res, 200, { deleted: true, removedListings });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/listings") {
     const body = await readJson(req);
     const data = await readStore();
