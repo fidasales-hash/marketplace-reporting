@@ -9,7 +9,8 @@ const state = {
   summary: [],
   supplierSummary: [],
   marketplaceSummary: [],
-  supplierMarketplaceSummary: []
+  supplierMarketplaceSummary: [],
+  takealotLoadsheets: {}
 };
 
 const productSort = {
@@ -45,6 +46,13 @@ const currency = new Intl.NumberFormat("en-ZA", {
   style: "currency",
   currency: "ZAR"
 });
+
+const listingStatusLabels = {
+  draft: "Draft",
+  approved: "Approved",
+  exported: "Exported",
+  live: "Live"
+};
 
 const productColumns = [
   { id: "merge", label: "Merge", defaultVisible: true },
@@ -132,6 +140,7 @@ setInterval(async () => { await load(); await refreshReport(); }, 5 * 60 * 1000)
 
 async function load() {
   Object.assign(state, await api("/api/bootstrap"));
+  state.takealotLoadsheets = await api("/api/takealot-loadsheets");
   renderStaticData();
 }
 
@@ -301,6 +310,44 @@ function bindForms() {
     if (!event.target.matches("[data-delete-supplier]")) return;
     await deleteSupplier(event.target.dataset.deleteSupplier);
   });
+
+  qs("#new-product-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitNewProduct(event.currentTarget);
+  });
+
+  qs("#listing-list").addEventListener("click", async (event) => {
+    if (event.target.matches("[data-approve-listing]")) {
+      await setListingApproval(event.target.dataset.approveListing, "approve");
+    } else if (event.target.matches("[data-unapprove-listing]")) {
+      await setListingApproval(event.target.dataset.unapproveListing, "unapprove");
+    } else if (event.target.matches("[data-mark-live-listing]")) {
+      await setListingApproval(event.target.dataset.markLiveListing, "mark-live");
+    }
+  });
+}
+
+async function submitNewProduct(form) {
+  const payload = Object.fromEntries(new FormData(form).entries());
+  const marketplaces = qsa('input[name="marketplace-enabled"]:checked', form).map((checkbox) => ({
+    marketplaceId: checkbox.value,
+    category: form.elements[`marketplace-category-${checkbox.value}`]?.value || "",
+    topCategory: form.elements[`marketplace-topcategory-${checkbox.value}`]?.value || "",
+    loadsheetKey: form.elements[`marketplace-loadsheet-${checkbox.value}`]?.value || ""
+  }));
+  await api("/api/products", {
+    method: "POST",
+    body: JSON.stringify({ ...payload, marketplaces })
+  });
+  form.reset();
+  await load();
+  await refreshReport();
+}
+
+async function setListingApproval(listingId, action) {
+  await api(`/api/listings/${listingId}/${action}`, { method: "POST" });
+  await load();
+  await refreshReport();
 }
 
 function bindPostForm(selector, endpoint) {
@@ -320,6 +367,7 @@ function renderStaticData() {
   fillSupplierSelects();
   fillProductSelects();
   fillListingSelects();
+  renderMarketplacePicker();
   renderProductColumnPicker();
   applyProductTableDisplay();
   renderSuppliers();
@@ -988,15 +1036,62 @@ async function assignProductSupplier(productId, supplierId) {
   await refreshReport();
 }
 
+function renderMarketplacePicker() {
+  const container = qs("#new-product-marketplaces");
+  if (!container) return;
+  container.innerHTML = state.marketplaces.map((marketplace) => {
+    if (marketplace.id === "takealot") {
+      const loadsheetOptions = Object.entries(state.takealotLoadsheets)
+        .map(([key, entry]) => option(key, entry.label))
+        .join("");
+      return `
+        <div class="marketplace-picker-row marketplace-picker-row-takealot">
+          <label class="marketplace-picker-toggle">
+            <input type="checkbox" name="marketplace-enabled" value="${escapeHtml(marketplace.id)}">
+            ${escapeHtml(marketplace.name)}
+          </label>
+          <div class="marketplace-picker-fields">
+            <select name="marketplace-loadsheet-${escapeHtml(marketplace.id)}">
+              <option value="">Pick a loadsheet...</option>
+              ${loadsheetOptions}
+            </select>
+            <input type="text" name="marketplace-topcategory-${escapeHtml(marketplace.id)}" placeholder="Top Category, e.g. Hair Care (30186)">
+            <input type="text" name="marketplace-category-${escapeHtml(marketplace.id)}" placeholder="Category, e.g. Wigs (30961)">
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="marketplace-picker-row">
+        <label class="marketplace-picker-toggle">
+          <input type="checkbox" name="marketplace-enabled" value="${escapeHtml(marketplace.id)}">
+          ${escapeHtml(marketplace.name)}
+        </label>
+        <input type="text" name="marketplace-category-${escapeHtml(marketplace.id)}" placeholder="Category (id or name for this marketplace)">
+      </div>
+    `;
+  }).join("");
+}
+
 function renderListings() {
   qs("#listing-list").innerHTML = state.listings.map((listing) => {
     const product = state.products.find((item) => item.id === listing.productId);
     const marketplace = state.marketplaces.find((item) => item.id === listing.marketplaceId);
+    const status = listing.approvalStatus || "live";
+    const statusLabel = listingStatusLabels[status] || status;
     return `
       <article class="list-item">
         <strong>${escapeHtml(product?.name ?? "Unknown product")}</strong>
         <span class="meta">${escapeHtml(marketplace?.name ?? listing.marketplaceId)} · ${escapeHtml(listing.identifierType)} ${escapeHtml(listing.marketplaceIdentifier)} · SKU ${escapeHtml(listing.marketplaceSku || "n/a")}</span>
         <span>${escapeHtml(listing.title || "No marketplace title")}</span>
+        <span class="listing-status-row">
+          <span class="status-pill status-${escapeHtml(status)}">${escapeHtml(statusLabel)}</span>
+          ${listing.category ? `<span class="meta">${escapeHtml(listing.topCategory ? `${listing.topCategory} → ${listing.category}` : listing.category)}</span>` : ""}
+          ${listing.loadsheetKey ? `<span class="meta">Loadsheet: ${escapeHtml(state.takealotLoadsheets[listing.loadsheetKey]?.label || listing.loadsheetKey)}</span>` : ""}
+          ${status === "draft" ? `<button type="button" data-approve-listing="${listing.id}">Approve</button>` : ""}
+          ${status === "approved" ? `<button type="button" data-unapprove-listing="${listing.id}">Move back to draft</button>` : ""}
+          ${status === "exported" ? `<button type="button" data-mark-live-listing="${listing.id}">Mark as live</button>` : ""}
+        </span>
       </article>
     `;
   }).join("");

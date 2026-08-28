@@ -4,6 +4,9 @@ import { testTakealotConnection, syncTakealotApiData, syncTakealotOffers, update
 import { getConfig, loadEnv } from "./config.js";
 import { buildMarketplaceSummary, buildProductSummary, buildSupplierMarketplaceSummary, buildSupplierSummary } from "./reporting.js";
 import { makeId, readStore, writeStore } from "./db.js";
+import { buildBobshopCsv } from "./adapters/bobshop.js";
+import { AMAZON_TEMPLATES, buildAmazonListingBuffer } from "./adapters/amazon-listing-csv.js";
+import { TAKEALOT_LOADSHEETS, buildTakealotLoadsheetBuffer } from "./adapters/takealot-loadsheet.js";
 
 await loadEnv();
 const config = getConfig();
@@ -224,11 +227,44 @@ export async function handleApi(req, res, url) {
       sku: body.sku,
       supplierId: body.supplierId || null,
       cost: Number(body.cost) || 0,
-      currency: body.currency || "ZAR"
+      currency: body.currency || "ZAR",
+      description: body.description || "",
+      condition: body.condition || "NEW",
+      price: body.price !== undefined ? Number(body.price) || 0 : undefined,
+      images: parseImageList(body.images),
+      weightKg: body.weightKg || ""
     };
     data.products.push(product);
+
+    // Optional one-shot intake: create a draft listing per marketplace the
+    // product should appear on, so nothing new products spawn without an
+    // explicit review/approve step.
+    const createdListings = [];
+    const marketplaceSelections = Array.isArray(body.marketplaces) ? body.marketplaces : [];
+    for (const selection of marketplaceSelections) {
+      if (!selection?.marketplaceId) continue;
+      const listing = {
+        id: makeId("lst"),
+        productId: product.id,
+        marketplaceId: selection.marketplaceId,
+        marketplaceIdentifier: "",
+        identifierType: "SKU",
+        marketplaceSku: product.sku || "",
+        title: product.name || "",
+        active: true,
+        approvalStatus: "draft",
+        category: selection.category || "",
+        topCategory: selection.topCategory || "",
+        loadsheetKey: selection.loadsheetKey || "",
+        price: selection.price !== undefined && selection.price !== "" ? Number(selection.price) : product.price,
+        qty: selection.qty !== undefined && selection.qty !== "" ? Number(selection.qty) : 1
+      };
+      data.listings.push(listing);
+      createdListings.push(listing);
+    }
+
     await writeStore(data);
-    sendJson(res, 201, product);
+    sendJson(res, 201, { product, listings: createdListings });
     return;
   }
 
@@ -339,6 +375,186 @@ export async function handleApi(req, res, url) {
     data.listings.push(listing);
     await writeStore(data);
     sendJson(res, 201, listing);
+    return;
+  }
+
+  const listingMatch = url.pathname.match(/^\/api\/listings\/([^/]+)$/);
+  if (req.method === "PATCH" && listingMatch) {
+    const body = await readJson(req);
+    const data = await readStore();
+    const listing = data.listings.find((item) => item.id === listingMatch[1]);
+    if (!listing) {
+      sendJson(res, 404, { error: "Listing not found." });
+      return;
+    }
+    const editable = ["category", "topCategory", "loadsheetKey", "whatsInTheBox", "colorMain", "price", "qty", "description", "condition", "title", "rrp", "gtin", "widthCm", "lengthCm", "heightCm", "weightKg", "gender", "size", "countryOfOrigin", "handlingTimeDays"];
+    for (const field of editable) {
+      if (body[field] === undefined) continue;
+      listing[field] = ["price", "qty", "rrp", "handlingTimeDays"].includes(field) ? Number(body[field]) : body[field];
+    }
+    if (Array.isArray(body.images)) listing.images = body.images;
+    await writeStore(data);
+    sendJson(res, 200, listing);
+    return;
+  }
+
+  const listingApproveMatch = url.pathname.match(/^\/api\/listings\/([^/]+)\/approve$/);
+  if (req.method === "POST" && listingApproveMatch) {
+    const data = await readStore();
+    const listing = data.listings.find((item) => item.id === listingApproveMatch[1]);
+    if (!listing) {
+      sendJson(res, 404, { error: "Listing not found." });
+      return;
+    }
+    if (!listing.category) {
+      sendJson(res, 400, { error: "Set a marketplace category before approving." });
+      return;
+    }
+    if (listing.marketplaceId === "takealot" && (!listing.topCategory || !listing.loadsheetKey)) {
+      sendJson(res, 400, { error: "Set a Top Category and pick a Loadsheet before approving a Takealot listing." });
+      return;
+    }
+    if (listing.marketplaceId === "amazon" && (!listing.loadsheetKey || !AMAZON_TEMPLATES[listing.loadsheetKey])) {
+      sendJson(res, 400, { error: "Pick a valid Amazon template (see GET /api/amazon-templates) before approving an Amazon listing." });
+      return;
+    }
+    listing.approvalStatus = "approved";
+    await writeStore(data);
+    sendJson(res, 200, listing);
+    return;
+  }
+
+  const listingUnapproveMatch = url.pathname.match(/^\/api\/listings\/([^/]+)\/unapprove$/);
+  if (req.method === "POST" && listingUnapproveMatch) {
+    const data = await readStore();
+    const listing = data.listings.find((item) => item.id === listingUnapproveMatch[1]);
+    if (!listing) {
+      sendJson(res, 404, { error: "Listing not found." });
+      return;
+    }
+    listing.approvalStatus = "draft";
+    await writeStore(data);
+    sendJson(res, 200, listing);
+    return;
+  }
+
+  const listingLiveMatch = url.pathname.match(/^\/api\/listings\/([^/]+)\/mark-live$/);
+  if (req.method === "POST" && listingLiveMatch) {
+    const data = await readStore();
+    const listing = data.listings.find((item) => item.id === listingLiveMatch[1]);
+    if (!listing) {
+      sendJson(res, 404, { error: "Listing not found." });
+      return;
+    }
+    listing.approvalStatus = "live";
+    await writeStore(data);
+    sendJson(res, 200, listing);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/export/bobshop.csv") {
+    const data = await readStore();
+    const items = data.listings
+      .filter((listing) => listing.marketplaceId === "bob-shop" && listing.approvalStatus === "approved")
+      .map((listing) => ({ listing, product: data.products.find((product) => product.id === listing.productId) }))
+      .filter((item) => item.product);
+
+    if (items.length === 0) {
+      sendJson(res, 400, { error: "No approved Bob Shop listings to export. Approve at least one listing first." });
+      return;
+    }
+
+    const csv = buildBobshopCsv(items);
+    for (const { listing } of items) listing.approvalStatus = "exported";
+    await writeStore(data);
+
+    res.writeHead(200, {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="bobshop_bulk_upload_${new Date().toISOString().slice(0, 10)}.csv"`
+    });
+    res.end(csv);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/amazon-templates") {
+    sendJson(res, 200, AMAZON_TEMPLATES);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/export/amazon.xlsm") {
+    const templateKey = url.searchParams.get("template");
+    if (!templateKey || !AMAZON_TEMPLATES[templateKey]) {
+      sendJson(res, 400, { error: "Pass a valid ?template= key. See GET /api/amazon-templates for options." });
+      return;
+    }
+
+    const data = await readStore();
+    const items = data.listings
+      .filter((listing) => listing.marketplaceId === "amazon" && listing.approvalStatus === "approved" && listing.loadsheetKey === templateKey)
+      .map((listing) => ({ listing, product: data.products.find((product) => product.id === listing.productId) }))
+      .filter((item) => item.product);
+
+    if (items.length === 0) {
+      sendJson(res, 400, { error: `No approved Amazon listings for the "${templateKey}" template. Approve at least one first.` });
+      return;
+    }
+
+    let buffer;
+    try {
+      buffer = await buildAmazonListingBuffer(items, templateKey);
+    } catch (error) {
+      sendJson(res, 500, { error: `Failed to build Amazon file: ${error.message}` });
+      return;
+    }
+    for (const { listing } of items) listing.approvalStatus = "exported";
+    await writeStore(data);
+
+    res.writeHead(200, {
+      "Content-Type": "application/vnd.ms-excel.sheet.macroEnabled.12",
+      "Content-Disposition": `attachment; filename="amazon_${templateKey}_${new Date().toISOString().slice(0, 10)}.xlsm"`
+    });
+    res.end(buffer);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/takealot-loadsheets") {
+    sendJson(res, 200, TAKEALOT_LOADSHEETS);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/export/takealot.xlsm") {
+    const loadsheetKey = url.searchParams.get("loadsheet");
+    if (!loadsheetKey || !TAKEALOT_LOADSHEETS[loadsheetKey]) {
+      sendJson(res, 400, { error: "Pass a valid ?loadsheet= key. See GET /api/takealot-loadsheets for options." });
+      return;
+    }
+
+    const data = await readStore();
+    const items = data.listings
+      .filter((listing) => listing.marketplaceId === "takealot" && listing.approvalStatus === "approved" && listing.loadsheetKey === loadsheetKey)
+      .map((listing) => ({ listing, product: data.products.find((product) => product.id === listing.productId) }))
+      .filter((item) => item.product);
+
+    if (items.length === 0) {
+      sendJson(res, 400, { error: `No approved Takealot listings for the "${loadsheetKey}" loadsheet. Approve at least one first.` });
+      return;
+    }
+
+    let buffer;
+    try {
+      buffer = await buildTakealotLoadsheetBuffer(items, loadsheetKey);
+    } catch (error) {
+      sendJson(res, 500, { error: `Failed to build loadsheet: ${error.message}` });
+      return;
+    }
+    for (const { listing } of items) listing.approvalStatus = "exported";
+    await writeStore(data);
+
+    res.writeHead(200, {
+      "Content-Type": "application/vnd.ms-excel.sheet.macroEnabled.12",
+      "Content-Disposition": `attachment; filename="takealot_${loadsheetKey}_${new Date().toISOString().slice(0, 10)}.xlsm"`
+    });
+    res.end(buffer);
     return;
   }
 
@@ -658,6 +874,14 @@ function parseNumber(value) {
   }
 
   return Number(text) || 0;
+}
+
+function parseImageList(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  return String(value || "")
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 export function sendJson(res, status, payload) {
