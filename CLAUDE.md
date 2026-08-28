@@ -76,10 +76,16 @@ The "New Product" form's Image URLs field also accepts drag-and-drop / browsed f
 pasted URLs. Dropped files upload via `POST /api/uploads?filename=<name>` (raw image bytes as the
 request body, `Content-Type` set to the file's mime type) to a Vercel Blob store, returning
 `{ url }`, which gets appended into the same textarea client-side - the backend's `images` field
-handling is unchanged either way. Requires a `BLOB_READ_WRITE_TOKEN` env var: create a Blob store
-under the Vercel project's Storage tab (auto-injects the token in production); for local dev,
-copy that same token into `.env`. Without it, `/api/uploads` returns a clear 500 rather than
-failing silently.
+handling is unchanged either way. Needs a Vercel Blob store connected to this project (Storage
+tab -> Connect to Project). A connected store uses OIDC by default: Vercel injects `BLOB_STORE_ID`
+into the project's env vars, and a short-lived `VERCEL_OIDC_TOKEN` gets issued automatically at
+request time on every Vercel deployment - neither needs to be set by hand, and
+`VERCEL_OIDC_TOKEN` won't even show up in the dashboard's env var list. The older
+`BLOB_READ_WRITE_TOKEN` (a static token, also accepted) only appears if the store was created
+before OIDC connections existed, or you explicitly add one. For local dev, `vercel env pull` (not
+`.env`) is how the Vercel CLI docs say to get one of these into `process.env`; untested locally in
+this project. `/api/uploads` returns a clear 500 if neither is present, rather than failing
+silently.
 
 ## Bob Shop export
 

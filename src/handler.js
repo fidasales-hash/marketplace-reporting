@@ -220,8 +220,8 @@ export async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/uploads") {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      sendJson(res, 500, { error: "Image uploads aren't configured - add a Vercel Blob store to this project (Storage tab) and set BLOB_READ_WRITE_TOKEN." });
+    if (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.BLOB_STORE_ID) {
+      sendJson(res, 500, { error: "Image uploads aren't configured - connect a Vercel Blob store to this project (Storage tab)." });
       return;
     }
     const filename = url.searchParams.get("filename") || `upload-${Date.now()}`;
