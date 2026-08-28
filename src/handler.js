@@ -4,6 +4,7 @@ import { testTakealotConnection, syncTakealotApiData, syncTakealotOffers, update
 import { getConfig, loadEnv } from "./config.js";
 import { buildMarketplaceSummary, buildProductSummary, buildSupplierMarketplaceSummary, buildSupplierSummary } from "./reporting.js";
 import { makeId, readStore, writeStore } from "./db.js";
+import { put } from "@vercel/blob";
 import { buildBobshopCsv } from "./adapters/bobshop.js";
 import { AMAZON_TEMPLATES, buildAmazonListingBuffer } from "./adapters/amazon-listing-csv.js";
 import { TAKEALOT_LOADSHEETS, buildTakealotLoadsheetBuffer } from "./adapters/takealot-loadsheet.js";
@@ -215,6 +216,33 @@ export async function handleApi(req, res, url) {
     }
     await writeStore(data);
     sendJson(res, 200, { deleted: true });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/uploads") {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      sendJson(res, 500, { error: "Image uploads aren't configured - add a Vercel Blob store to this project (Storage tab) and set BLOB_READ_WRITE_TOKEN." });
+      return;
+    }
+    const filename = url.searchParams.get("filename") || `upload-${Date.now()}`;
+    const contentType = req.headers["content-type"] || "application/octet-stream";
+    if (!contentType.startsWith("image/")) {
+      sendJson(res, 400, { error: "Only image uploads are accepted." });
+      return;
+    }
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const buffer = Buffer.concat(chunks);
+    if (buffer.length === 0) {
+      sendJson(res, 400, { error: "Uploaded file is empty." });
+      return;
+    }
+    try {
+      const blob = await put(filename, buffer, { access: "public", contentType, addRandomSuffix: true });
+      sendJson(res, 201, { url: blob.url });
+    } catch (error) {
+      sendJson(res, 500, { error: `Upload failed: ${error.message}` });
+    }
     return;
   }
 

@@ -316,6 +316,8 @@ function bindForms() {
     await submitNewProduct(event.currentTarget);
   });
 
+  bindImageDropzone();
+
   qs("#listing-list").addEventListener("click", async (event) => {
     if (event.target.matches("[data-approve-listing]")) {
       await setListingApproval(event.target.dataset.approveListing, "approve");
@@ -340,8 +342,98 @@ async function submitNewProduct(form) {
     body: JSON.stringify({ ...payload, marketplaces })
   });
   form.reset();
+  renderImagePreviews();
   await load();
   await refreshReport();
+}
+
+function getImageUrls() {
+  return qs("#new-product-images").value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function setImageUrls(urls) {
+  qs("#new-product-images").value = urls.join("\n");
+  renderImagePreviews();
+}
+
+function addImageUrls(newUrls) {
+  setImageUrls([...getImageUrls(), ...newUrls]);
+}
+
+function renderImagePreviews() {
+  const list = qs("#image-preview-list");
+  if (!list) return;
+  list.innerHTML = getImageUrls().map((url) => `
+    <div class="image-preview">
+      <img src="${escapeHtml(url)}" alt="" loading="lazy">
+      <button type="button" data-remove-image="${escapeHtml(url)}" title="Remove">&times;</button>
+    </div>
+  `).join("");
+}
+
+async function uploadImageFile(file) {
+  const result = await api(`/api/uploads?filename=${encodeURIComponent(file.name)}`, {
+    method: "POST",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file
+  });
+  return result.url;
+}
+
+async function handleImageFiles(fileList) {
+  const files = [...fileList].filter((file) => file.type.startsWith("image/"));
+  if (files.length === 0) return;
+
+  const status = qs("#image-upload-status");
+  const uploaded = [];
+  for (const [index, file] of files.entries()) {
+    if (status) status.textContent = `Uploading ${index + 1} of ${files.length}...`;
+    try {
+      uploaded.push(await uploadImageFile(file));
+    } catch (error) {
+      if (status) status.textContent = `Failed to upload ${file.name}: ${error.message}`;
+    }
+  }
+  if (uploaded.length > 0) addImageUrls(uploaded);
+  if (status && status.textContent.startsWith("Uploading")) status.textContent = "";
+}
+
+function bindImageDropzone() {
+  const dropzone = qs("#image-dropzone");
+  const fileInput = qs("#image-file-input");
+  if (!dropzone || !fileInput) return;
+
+  qs("#image-browse-btn").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async (event) => {
+    await handleImageFiles(event.target.files);
+    fileInput.value = "";
+  });
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.add("is-dragover");
+    });
+  });
+  ["dragleave", "drop"].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.remove("is-dragover");
+    });
+  });
+  dropzone.addEventListener("drop", async (event) => {
+    await handleImageFiles(event.dataTransfer.files);
+  });
+
+  qs("#new-product-images").addEventListener("input", renderImagePreviews);
+  qs("#image-preview-list").addEventListener("click", (event) => {
+    const url = event.target.dataset.removeImage;
+    if (url === undefined) return;
+    setImageUrls(getImageUrls().filter((item) => item !== url));
+  });
 }
 
 async function setListingApproval(listingId, action) {

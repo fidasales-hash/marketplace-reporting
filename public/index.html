@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Marketplace Reporting</title>
-    <link rel="stylesheet" href="/styles.css?v=20260827b-multi-channel-export">
+    <link rel="stylesheet" href="/styles.css?v=20260828a-image-dropzone">
   </head>
   <body>
     <aside class="sidebar">
@@ -176,7 +176,15 @@
               <label>Weight (kg)<input name="weightKg" type="number" step="0.001" min="0"></label>
             </div>
             <label class="full-width">Description<textarea name="description" rows="4" placeholder="What the product is, what's in the box, key details"></textarea></label>
-            <label class="full-width">Image URLs<textarea name="images" rows="2" placeholder="One per line, or comma-separated"></textarea></label>
+            <label class="full-width">Image URLs<textarea name="images" id="new-product-images" rows="2" placeholder="One per line, or comma-separated"></textarea></label>
+            <div class="full-width">
+              <div id="image-dropzone" class="image-dropzone">
+                <p>Drag images here to upload, or <button type="button" id="image-browse-btn">browse files</button></p>
+                <input type="file" id="image-file-input" accept="image/*" multiple hidden>
+              </div>
+              <p id="image-upload-status" class="meta"></p>
+              <div id="image-preview-list" class="image-preview-list"></div>
+            </div>
 
             <div class="panel-title compact-title" style="margin-top:1rem">
               <h3>List on marketplaces</h3>
@@ -338,6 +346,6 @@
 
     </main>
 
-    <script src="/app.js?v=20260827b-multi-channel-export" type="module"></script>
+    <script src="/app.js?v=20260828a-image-dropzone" type="module"></script>
   </body>
 </html>

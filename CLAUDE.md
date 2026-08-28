@@ -5,9 +5,14 @@ Multi-marketplace sales reporting for Takealot, Amazon, and Bob Shop.
 ## Stack
 
 - Node.js (ESM, >= 20), plain Express server — not Next.js
-- Local JSON data store: `data/db.json` (auto-created on first run)
-- Vercel deployed
-- Supabase SDK present but not yet wired as primary store
+- Data store: Supabase (`store` table, single JSON blob row) when `SUPABASE_URL`
+  and `SUPABASE_SERVICE_KEY` are set (production); otherwise a local JSON file
+  `data/db.json` (auto-created on first run) for local dev without those set
+- Vercel deployed via an explicit `vercel.json` `builds`/`routes` config
+  (`api/[...path].js` as the one function, `public/**` as static) — don't rely
+  on Vercel's zero-config auto-detection here; without a `build` script,
+  `outputDirectory` alone isn't enough and it has fallen back to a "legacy
+  Node.js server" mode that mis-executed `public/app.js` server-side
 
 ## Run
 
@@ -61,7 +66,20 @@ unaffected by this workflow.
 
 The "New Product" view in the UI drives this: fill in the canonical fields once, tick which
 marketplaces to list on, add each marketplace's category, submit. Review/approve happens in the
-Catalogue view's "Marketplace Mappings" list.
+Catalogue view's "Marketplace Mappings" list. `DELETE /api/products/:id` removes a product and
+cascades to delete its listings (there's no listing-level delete separately - merging or deleting
+the product is how a bad listing gets removed).
+
+### Image uploads
+
+The "New Product" form's Image URLs field also accepts drag-and-drop / browsed files, not just
+pasted URLs. Dropped files upload via `POST /api/uploads?filename=<name>` (raw image bytes as the
+request body, `Content-Type` set to the file's mime type) to a Vercel Blob store, returning
+`{ url }`, which gets appended into the same textarea client-side - the backend's `images` field
+handling is unchanged either way. Requires a `BLOB_READ_WRITE_TOKEN` env var: create a Blob store
+under the Vercel project's Storage tab (auto-injects the token in production); for local dev,
+copy that same token into `.env`. Without it, `/api/uploads` returns a clear 500 rather than
+failing silently.
 
 ## Bob Shop export
 
