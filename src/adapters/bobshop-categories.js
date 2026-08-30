@@ -9,6 +9,15 @@
 // or renumber categories at any time. If a category you need isn't here, or a
 // listing gets rejected for an invalid category id, look it up on Bob Shop's
 // "Categories for bulk loading" page (seller portal) and add it below.
+//
+// KNOWN GAP: this was scraped from the site's top nav, which only shows two
+// levels deep. Some entries that look like leaf categories are actually
+// parent nodes with their own real subcategories underneath (confirmed for
+// "Pantry" - id 22288 - which rejects real listings with a confusing
+// "you do not have permission..." error; it's been replaced below with its
+// 11 actual leaf children). Any other entry could have the same problem -
+// verify on Bob Shop's own category page (https://www.bobshop.co.za/<slug>/c/<id>)
+// before trusting an id here for a real listing.
 
 export const BOBSHOP_CATEGORIES = [
   { group: "Computers & Networking", id: "18836", name: "Computers & Networking" },
@@ -90,7 +99,17 @@ export const BOBSHOP_CATEGORIES = [
   { group: "Groceries & Household", id: "22268", name: "Dairy, Eggs & Milk" },
   { group: "Groceries & Household", id: "20013", name: "Fruit & Vegetables" },
   { group: "Groceries & Household", id: "20008", name: "Meat, Poultry & Fish" },
-  { group: "Groceries & Household", id: "22288", name: "Pantry" },
+  { group: "Groceries & Household", id: "22289", name: "Pantry - Biscuits, Rusks & Crackers" },
+  { group: "Groceries & Household", id: "22290", name: "Pantry - Breakfast Cereals & Bars" },
+  { group: "Groceries & Household", id: "11222", name: "Pantry - Cans, Jars & Packaged Foods" },
+  { group: "Groceries & Household", id: "3504", name: "Pantry - Coffee, Tea & Hot Drinks" },
+  { group: "Groceries & Household", id: "11219", name: "Pantry - Condiments, Sauces & Gravy" },
+  { group: "Groceries & Household", id: "6681", name: "Pantry - Herbs & Spices" },
+  { group: "Groceries & Household", id: "22292", name: "Pantry - Indian, Asian & Mexican Foods" },
+  { group: "Groceries & Household", id: "624", name: "Pantry - Jams, Honey & Spreads" },
+  { group: "Groceries & Household", id: "11225", name: "Pantry - Oils & Vinegars" },
+  { group: "Groceries & Household", id: "11218", name: "Pantry - Pasta, Rice & Grains" },
+  { group: "Groceries & Household", id: "7378", name: "Pantry - Other" },
   { group: "Groceries & Household", id: "22293", name: "Ready Meals" },
   { group: "Groceries & Household", id: "22303", name: "Snacks, Chips & Sweets" },
 
