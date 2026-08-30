@@ -375,12 +375,14 @@ function renderImagePreviews() {
 }
 
 async function uploadImageFile(file) {
-  const result = await api(`/api/uploads?filename=${encodeURIComponent(file.name)}`, {
+  const response = await fetch(`/api/uploads?filename=${encodeURIComponent(file.name)}`, {
     method: "POST",
     headers: { "Content-Type": file.type || "application/octet-stream" },
     body: file
   });
-  return result.url;
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || `Request failed: ${response.status}`);
+  return body.url;
 }
 
 async function handleImageFiles(fileList) {
