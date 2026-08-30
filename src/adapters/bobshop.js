@@ -55,12 +55,21 @@ function formatBobshopDate(date) {
   return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+// Bob Shop rejects start/stop times that aren't on a 15-minute boundary
+// (0, 15, 30, 45) - round down to the nearest one, zeroing seconds/ms so the
+// same boundary survives re-formatting.
+function roundDownToQuarterHour(date) {
+  const rounded = new Date(date);
+  rounded.setMinutes(Math.floor(rounded.getMinutes() / 15) * 15, 0, 0);
+  return rounded;
+}
+
 // listing carries the marketplace-specific fields (category, price, qty, images,
 // description, condition); product supplies fallbacks so a listing only has to
 // override what differs from the canonical record.
 export function buildBobshopCsvRow(product, listing, { durationDays = 30, now = new Date() } = {}) {
-  const start = now;
-  const stop = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+  const start = roundDownToQuarterHour(now);
+  const stop = new Date(start.getTime() + durationDays * 24 * 60 * 60 * 1000);
   const images = (listing.images && listing.images.length ? listing.images : product.images) || [];
 
   const row = new Array(BOBSHOP_CSV_HEADER.length).fill("");
