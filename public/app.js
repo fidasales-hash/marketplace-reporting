@@ -132,6 +132,8 @@ let activeColumnResize = null;
 let activeColumnDrag = null;
 let suppressNextHeaderClick = false;
 const activeTableWidthTotals = { product: 0, sales: 0 };
+const catalogueFilter = { search: "", status: "", marketplaceId: "" };
+const catalogueStatusPriority = { draft: 0, approved: 1, exported: 2, live: 3 };
 
 await load();
 bindNavigation();
@@ -1196,9 +1198,6 @@ function bobshopCategoryOptions() {
     </optgroup>
   `).join("");
 }
-
-const catalogueFilter = { search: "", status: "", marketplaceId: "" };
-const catalogueStatusPriority = { draft: 0, approved: 1, exported: 2, live: 3 };
 
 function renderMarketplaceFilterOptions() {
   const select = qs("#catalogue-marketplace-filter");
