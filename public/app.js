@@ -10,7 +10,8 @@ const state = {
   supplierSummary: [],
   marketplaceSummary: [],
   supplierMarketplaceSummary: [],
-  takealotLoadsheets: {}
+  takealotLoadsheets: {},
+  bobshopCategories: []
 };
 
 const productSort = {
@@ -141,6 +142,7 @@ setInterval(async () => { await load(); await refreshReport(); }, 5 * 60 * 1000)
 async function load() {
   Object.assign(state, await api("/api/bootstrap"));
   state.takealotLoadsheets = await api("/api/takealot-loadsheets");
+  state.bobshopCategories = await api("/api/bobshop-categories");
   renderStaticData();
 }
 
@@ -1155,6 +1157,20 @@ function renderMarketplacePicker() {
         </div>
       `;
     }
+    if (marketplace.id === "bob-shop") {
+      return `
+        <div class="marketplace-picker-row">
+          <label class="marketplace-picker-toggle">
+            <input type="checkbox" name="marketplace-enabled" value="${escapeHtml(marketplace.id)}">
+            ${escapeHtml(marketplace.name)}
+          </label>
+          <select name="marketplace-category-${escapeHtml(marketplace.id)}">
+            <option value="">Pick a category...</option>
+            ${bobshopCategoryOptions()}
+          </select>
+        </div>
+      `;
+    }
     return `
       <div class="marketplace-picker-row">
         <label class="marketplace-picker-toggle">
@@ -1165,6 +1181,19 @@ function renderMarketplacePicker() {
       </div>
     `;
   }).join("");
+}
+
+function bobshopCategoryOptions() {
+  const groups = new Map();
+  for (const category of state.bobshopCategories || []) {
+    if (!groups.has(category.group)) groups.set(category.group, []);
+    groups.get(category.group).push(category);
+  }
+  return [...groups.entries()].map(([group, categories]) => `
+    <optgroup label="${escapeHtml(group)}">
+      ${categories.map((category) => option(category.id, category.name)).join("")}
+    </optgroup>
+  `).join("");
 }
 
 function renderListings() {

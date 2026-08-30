@@ -6,6 +6,7 @@ import { buildMarketplaceSummary, buildProductSummary, buildSupplierMarketplaceS
 import { makeId, readStore, writeStore } from "./db.js";
 import { put } from "@vercel/blob";
 import { buildBobshopCsv } from "./adapters/bobshop.js";
+import { BOBSHOP_CATEGORIES } from "./adapters/bobshop-categories.js";
 import { AMAZON_TEMPLATES, buildAmazonListingBuffer } from "./adapters/amazon-listing-csv.js";
 import { TAKEALOT_LOADSHEETS, buildTakealotLoadsheetBuffer } from "./adapters/takealot-loadsheet.js";
 
@@ -564,6 +565,11 @@ export async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/takealot-loadsheets") {
     sendJson(res, 200, TAKEALOT_LOADSHEETS);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/bobshop-categories") {
+    sendJson(res, 200, BOBSHOP_CATEGORIES);
     return;
   }
 
