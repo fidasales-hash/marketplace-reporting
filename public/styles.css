@@ -1108,10 +1108,34 @@ th {
   background: #cdeee6;
 }
 
+.catalogue-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.catalogue-toolbar input,
+.catalogue-toolbar select {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  color: var(--ink);
+}
+
+#catalogue-search {
+  flex: 1 1 220px;
+  min-width: 160px;
+}
+
 .export-links {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--line);
 }
 
 .export-links a {

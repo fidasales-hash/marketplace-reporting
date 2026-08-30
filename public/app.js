@@ -319,6 +319,7 @@ function bindForms() {
   });
 
   bindImageDropzone();
+  bindCatalogueFilters();
 
   qs("#listing-list").addEventListener("click", async (event) => {
     if (event.target.matches("[data-approve-listing]")) {
@@ -1196,10 +1197,54 @@ function bobshopCategoryOptions() {
   `).join("");
 }
 
+const catalogueFilter = { search: "", status: "", marketplaceId: "" };
+const catalogueStatusPriority = { draft: 0, approved: 1, exported: 2, live: 3 };
+
+function renderMarketplaceFilterOptions() {
+  const select = qs("#catalogue-marketplace-filter");
+  if (!select || select.dataset.filled) return;
+  select.dataset.filled = "1";
+  select.insertAdjacentHTML("beforeend", state.marketplaces.map((m) => option(m.id, m.name)).join(""));
+}
+
+function matchesCatalogueFilter(listing, product, marketplace) {
+  const status = listing.approvalStatus || "live";
+  if (catalogueFilter.status && status !== catalogueFilter.status) return false;
+  if (catalogueFilter.marketplaceId && listing.marketplaceId !== catalogueFilter.marketplaceId) return false;
+  if (catalogueFilter.search) {
+    const haystack = [product?.name, marketplace?.name, listing.title, listing.marketplaceSku, listing.marketplaceIdentifier]
+      .filter(Boolean).join(" ").toLowerCase();
+    if (!haystack.includes(catalogueFilter.search)) return false;
+  }
+  return true;
+}
+
 function renderListings() {
-  qs("#listing-list").innerHTML = state.listings.map((listing) => {
-    const product = state.products.find((item) => item.id === listing.productId);
-    const marketplace = state.marketplaces.find((item) => item.id === listing.marketplaceId);
+  renderMarketplaceFilterOptions();
+
+  const rows = state.listings
+    .map((listing) => ({
+      listing,
+      product: state.products.find((item) => item.id === listing.productId),
+      marketplace: state.marketplaces.find((item) => item.id === listing.marketplaceId)
+    }))
+    .filter(({ listing, product, marketplace }) => matchesCatalogueFilter(listing, product, marketplace));
+
+  rows.sort((a, b) => {
+    const pa = catalogueStatusPriority[a.listing.approvalStatus || "live"] ?? 9;
+    const pb = catalogueStatusPriority[b.listing.approvalStatus || "live"] ?? 9;
+    if (pa !== pb) return pa - pb;
+    return (a.product?.name || "").localeCompare(b.product?.name || "");
+  });
+
+  const countEl = qs("#catalogue-listing-count");
+  if (countEl) {
+    countEl.textContent = rows.length === state.listings.length
+      ? `${state.listings.length} listing${state.listings.length === 1 ? "" : "s"}`
+      : `${rows.length} of ${state.listings.length} listings`;
+  }
+
+  qs("#listing-list").innerHTML = rows.map(({ listing, product, marketplace }) => {
     const status = listing.approvalStatus || "live";
     const statusLabel = listingStatusLabels[status] || status;
     return `
@@ -1217,7 +1262,27 @@ function renderListings() {
         </span>
       </article>
     `;
-  }).join("");
+  }).join("") || `<p class="meta">No listings match this filter.</p>`;
+}
+
+function bindCatalogueFilters() {
+  const search = qs("#catalogue-search");
+  const statusFilter = qs("#catalogue-status-filter");
+  const marketplaceFilter = qs("#catalogue-marketplace-filter");
+  if (!search || !statusFilter || !marketplaceFilter) return;
+
+  search.addEventListener("input", () => {
+    catalogueFilter.search = search.value.trim().toLowerCase();
+    renderListings();
+  });
+  statusFilter.addEventListener("change", () => {
+    catalogueFilter.status = statusFilter.value;
+    renderListings();
+  });
+  marketplaceFilter.addEventListener("change", () => {
+    catalogueFilter.marketplaceId = marketplaceFilter.value;
+    renderListings();
+  });
 }
 
 function renderSummary() {

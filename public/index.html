@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Marketplace Reporting</title>
-    <link rel="stylesheet" href="/styles.css?v=20260828d-bobshop-categories">
+    <link rel="stylesheet" href="/styles.css?v=20260828e-catalogue-ux">
   </head>
   <body>
     <aside class="sidebar">
@@ -220,6 +220,7 @@
             <div class="panel mappings-panel">
               <div class="panel-title compact-title">
                 <h3>Add Mapping</h3>
+                <span class="meta">For a listing that's already live elsewhere. To list something new, use "New Product" instead.</span>
               </div>
               <form id="listing-form" class="mapping-form">
                 <label>Canonical Product<select name="productId"></select></label>
@@ -234,13 +235,27 @@
             <div class="panel">
               <div class="panel-title compact-title">
                 <h3>Marketplace Mappings</h3>
-                <div class="export-links">
-                  <a id="export-bobshop-csv" href="/api/export/bobshop.csv" download>Bob Shop CSV</a>
-                  <a id="export-amazon-shoes" href="/api/export/amazon.xlsm?template=shoes" download>Amazon: Shoes</a>
-                  <a id="export-takealot-beauty" href="/api/export/takealot.xlsm?loadsheet=beauty" download>Takealot: Beauty</a>
-                  <a id="export-takealot-footwear" href="/api/export/takealot.xlsm?loadsheet=fashion-footwear" download>Takealot: Footwear</a>
-                  <a id="export-takealot-nonperishable" href="/api/export/takealot.xlsm?loadsheet=non-perishable" download>Takealot: Non-Perishable</a>
-                </div>
+                <span id="catalogue-listing-count" class="meta"></span>
+              </div>
+              <div class="catalogue-toolbar">
+                <input id="catalogue-search" type="search" placeholder="Search product, marketplace, SKU...">
+                <select id="catalogue-status-filter">
+                  <option value="">All statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="approved">Approved</option>
+                  <option value="exported">Exported</option>
+                  <option value="live">Live</option>
+                </select>
+                <select id="catalogue-marketplace-filter">
+                  <option value="">All marketplaces</option>
+                </select>
+              </div>
+              <div class="export-links">
+                <a id="export-bobshop-csv" href="/api/export/bobshop.csv" download>Bob Shop CSV</a>
+                <a id="export-amazon-shoes" href="/api/export/amazon.xlsm?template=shoes" download>Amazon: Shoes</a>
+                <a id="export-takealot-beauty" href="/api/export/takealot.xlsm?loadsheet=beauty" download>Takealot: Beauty</a>
+                <a id="export-takealot-footwear" href="/api/export/takealot.xlsm?loadsheet=fashion-footwear" download>Takealot: Footwear</a>
+                <a id="export-takealot-nonperishable" href="/api/export/takealot.xlsm?loadsheet=non-perishable" download>Takealot: Non-Perishable</a>
               </div>
               <div id="listing-list" class="list"></div>
             </div>
@@ -349,6 +364,6 @@
 
     </main>
 
-    <script src="/app.js?v=20260828d-bobshop-categories" type="module"></script>
+    <script src="/app.js?v=20260828e-catalogue-ux" type="module"></script>
   </body>
 </html>
