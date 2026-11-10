@@ -225,6 +225,51 @@ async function takealotRequest(config, pathname, options = {}) {
   return fetch(`${base}${pathname}`, { method, headers, body: options.body || undefined });
 }
 
+export async function createTakealotOffer(config, input) {
+  if (!isTakealotConfigured(config)) return missingConfigResult();
+
+  const barcode = String(input.barcode || "").trim();
+  const sku = String(input.sku || "").trim();
+  const sellingPrice = Number(input.sellingPrice);
+  const rrp = Number(input.rrp);
+  const leadtimeDays = Number(input.leadtimeDays);
+  const warehouseId = Number(input.warehouseId);
+  const quantity = Number(input.quantity);
+
+  if (!barcode || !sku || sku.length > 255) {
+    return { ok: false, status: 400, message: "A barcode and unique seller SKU (maximum 255 characters) are required." };
+  }
+  if (![sellingPrice, rrp, leadtimeDays, warehouseId, quantity].every(Number.isInteger) ||
+      sellingPrice <= 0 || rrp <= 0 || leadtimeDays < 0 || warehouseId <= 0 || quantity < 0) {
+    return { ok: false, status: 400, message: "Price, RRP, lead time, warehouse ID and quantity must be valid whole numbers. Price and RRP must be positive; quantity cannot be negative." };
+  }
+
+  const response = await takealotRequest(
+    config,
+    `/offers/offer/${encodeURIComponent(barcode)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        sku,
+        selling_price: sellingPrice,
+        rrp,
+        leadtime_days: leadtimeDays,
+        leadtime_stock: [{ merchant_warehouse_id: warehouseId, quantity }]
+      })
+    }
+  );
+  const payload = await response.json().catch(() => ({}));
+  return {
+    ok: response.ok && !(payload.validation_errors?.length),
+    status: response.status,
+    message: payload.validation_errors?.map((item) => item.message).filter(Boolean).join("; ") ||
+      payload.message ||
+      (response.ok ? "Takealot accepted the offer creation request." : `Takealot offer creation failed with status ${response.status}.`),
+    offer: payload.offer ?? null,
+    validationErrors: payload.validation_errors ?? []
+  };
+}
+
 export async function updateTakealotOfferStock(config, offerId, quantity) {
   if (!isTakealotConfigured(config)) return missingConfigResult();
   const response = await takealotRequest(config, `/offers/${encodeURIComponent(offerId)}`, {
