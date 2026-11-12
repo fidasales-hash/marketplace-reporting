@@ -1,0 +1,61 @@
+openapi: 3.1.0
+info:
+  title: Marketplace Control - Takealot Listing Agent
+  version: 1.0.0
+  description: Secure endpoint for creating an offer against an existing Takealot catalogue barcode.
+servers:
+  - url: https://marketplace-reporting-five.vercel.app
+paths:
+  /api/agent/takealot/offer:
+    post:
+      operationId: createTakealotOffer
+      summary: Create a Takealot seller offer
+      description: Creates an offer for an existing Takealot catalogue barcode. Requires explicit approval and the configured seller warehouse ID. This does not create a new catalogue product.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved, barcode, sku, sellingPrice, rrp, leadtimeDays, warehouseId, quantity]
+              properties:
+                approved:
+                  type: boolean
+                  enum: [true]
+                barcode:
+                  type: string
+                  description: Existing Takealot catalogue barcode.
+                sku:
+                  type: string
+                  maxLength: 255
+                sellingPrice:
+                  type: integer
+                  minimum: 1
+                rrp:
+                  type: integer
+                  minimum: 1
+                leadtimeDays:
+                  type: integer
+                  minimum: 0
+                warehouseId:
+                  type: integer
+                  minimum: 1
+                quantity:
+                  type: integer
+                  minimum: 0
+      responses:
+        '200':
+          description: Takealot accepted the offer request.
+        '400':
+          description: Invalid input or Takealot rejected the offer.
+        '401':
+          description: Missing or invalid bearer token.
+        '409':
+          description: Explicit approval is required.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
